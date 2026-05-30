@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+
+    <!--
+        Izinkan HTTP (cleartext) hanya untuk jaringan lokal / development.
+        Produksi (domain publik) tetap wajib HTTPS.
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Localhost -->
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>   <!-- Android Emulator → host PC -->
+        <domain includeSubdomains="false">10.0.0.2</domain>   <!-- Emulator alternatif -->
+        <domain includeSubdomains="false">192.168.1.1</domain>
+        <domain includeSubdomains="false">192.168.1.100</domain>
+    </domain-config>
+
+    <!-- Semua domain lain (produksi) tetap HTTPS only -->
+    <base-config cleartextTrafficPermitted="false" />
+
+</network-security-config>

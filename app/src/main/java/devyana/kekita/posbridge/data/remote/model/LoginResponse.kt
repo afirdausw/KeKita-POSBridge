@@ -1,16 +1,19 @@
 package devyana.kekita.posbridge.data.remote.model
 
+import com.google.gson.JsonElement
 import com.google.gson.annotations.SerializedName
 
 data class LoginResponse(
-    @SerializedName("success")
-    val success: Boolean,
+    @SerializedName("status")
+    val status: Boolean,
 
-    @SerializedName("message")
-    val message: String,
+    @SerializedName("data")
+    val data: JsonElement?
+)
 
-    @SerializedName("token")
-    val token: String?,
+data class LoginData(
+    @SerializedName("isLogin")
+    val isLogin: Boolean,
 
     @SerializedName("user")
     val user: UserData?
@@ -18,14 +21,17 @@ data class LoginResponse(
 
 data class UserData(
     @SerializedName("id")
-    val id: Int,
-
-    @SerializedName("username")
-    val username: String,
+    val id: String,
 
     @SerializedName("name")
     val name: String,
 
-    @SerializedName("role")
-    val role: String
+    @SerializedName("username")
+    val username: String,
+
+    @SerializedName("level")
+    val level: String,
+
+    @SerializedName("photo")
+    val photo: String?
 )

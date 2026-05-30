@@ -1,6 +1,7 @@
 package devyana.kekita.posbridge.data.repository
 
-import devyana.kekita.posbridge.data.remote.model.LoginRequest
+import com.google.gson.Gson
+import devyana.kekita.posbridge.data.remote.model.LoginData
 import devyana.kekita.posbridge.data.remote.model.LoginResponse
 import devyana.kekita.posbridge.data.remote.network.RetrofitClient
 import devyana.kekita.posbridge.utils.OutletManager
@@ -14,7 +15,6 @@ class AuthRepository(
 
     /**
      * Ambil AuthApiService dengan domain outlet yang tersimpan.
-     * Setiap call login selalu menggunakan domain terbaru dari OutletManager.
      */
     private fun getAuthApiService() =
         RetrofitClient.createAuthApiService(
@@ -24,22 +24,26 @@ class AuthRepository(
 
     /**
      * Login kasir/waiter ke API outlet.
-     * Credential dicek ke domain outlet yang sudah terdaftar di Step 1.
+     * Menyesuaikan format PHP: { "status": "success", "data": { ... } }
      */
     suspend fun login(username: String, password: String): Response<LoginResponse> {
-        val request = LoginRequest(username = username, password = password)
-        val response = getAuthApiService().login(request)
+        val response = getAuthApiService().login(username, password)
 
         if (response.isSuccessful) {
             val body = response.body()
-            if (body != null && body.success) {
-                body.token?.let { token ->
-                    sessionManager.saveAuthToken(token)
-                    sessionManager.saveUsername(username)
-                    body.user?.let { user ->
-                        sessionManager.saveUserDisplayName(user.name)
-                        sessionManager.saveUserRole(user.role)
+            // status adalah Boolean: true = login berhasil, false = gagal
+            if (body != null && body.status == true) {
+                // data bisa JsonObject atau false — parse manual agar aman
+                val loginData = try {
+                    body.data?.let {
+                        if (it.isJsonObject) Gson().fromJson(it, LoginData::class.java) else null
                     }
+                } catch (e: Exception) { null }
+
+                loginData?.user?.let { user ->
+                    sessionManager.saveUsername(user.username)
+                    sessionManager.saveUserDisplayName(user.name)
+                    sessionManager.saveUserRole(user.level)
                     sessionManager.setLoggedIn(true)
                 }
             }
@@ -49,6 +53,10 @@ class AuthRepository(
     }
 
     fun isLoggedIn(): Boolean = sessionManager.isLoggedIn()
+
+    fun getDisplayName(): String? = sessionManager.getUserDisplayName()
+    fun getUsername(): String?    = sessionManager.getUsername()
+    fun getRole(): String?        = sessionManager.getUserRole()
 
     fun clearSession() = sessionManager.clearSession()
 }

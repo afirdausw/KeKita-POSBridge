@@ -11,7 +11,7 @@ class OutletRepository(
 ) {
 
     /**
-     * Kirim kode akses ke Central API (GET verify.php?kode=XXX).
+     * Kirim kode akses ke Central API
      *
      * Jika response status == "success", simpan seluruh settings ke local storage:
      * - client       → name

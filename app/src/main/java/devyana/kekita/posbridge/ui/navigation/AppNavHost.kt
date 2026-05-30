@@ -12,6 +12,9 @@ import devyana.kekita.posbridge.data.repository.OutletRepository
 import devyana.kekita.posbridge.ui.accesscode.AccessCodeScreen
 import devyana.kekita.posbridge.ui.accesscode.AccessCodeViewModel
 import devyana.kekita.posbridge.ui.accesscode.AccessCodeViewModelFactory
+import devyana.kekita.posbridge.ui.home.HomeScreen
+import devyana.kekita.posbridge.ui.home.HomeViewModel
+import devyana.kekita.posbridge.ui.home.HomeViewModelFactory
 import devyana.kekita.posbridge.ui.login.LoginScreen
 import devyana.kekita.posbridge.ui.login.LoginViewModel
 import devyana.kekita.posbridge.ui.login.LoginViewModelFactory
@@ -64,9 +67,26 @@ fun AppNavHost(
             )
         }
 
-        // ─── Home (placeholder) ───────────────────────────────────────────────
+        // ─── Home ─────────────────────────────────────────────────────────────
         composable(Screen.Home.route) {
-            HomePlaceholderScreen()
+            val factory = HomeViewModelFactory(authRepository, outletRepository)
+            val viewModel: HomeViewModel = viewModel(factory = factory)
+
+            HomeScreen(
+                viewModel = viewModel,
+                onLogoutAccount = {
+                    // Logout akun → kembali ke Login, outlet masih ada
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                },
+                onLogoutSystem = {
+                    // Logout sistem → kembali ke AccessCode, semua direset
+                    navController.navigate(Screen.AccessCode.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                }
+            )
         }
     }
 }

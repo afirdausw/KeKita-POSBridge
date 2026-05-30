@@ -27,29 +27,28 @@ class LoginViewModel(
         viewModelScope.launch {
             try {
                 val response = authRepository.login(trimmedUsername, trimmedPassword)
+                val body = response.body()
 
-                when {
-                    response.isSuccessful && response.body()?.success == true -> {
+                if (response.isSuccessful && body != null) {
+                    if (body.status == true) {
                         _uiState.value = LoginUiState.Success
-                    }
-                    response.isSuccessful && response.body()?.success == false -> {
-                        val message = response.body()?.message ?: "Login gagal. Periksa kembali kredensial Anda."
-                        _uiState.value = LoginUiState.Error(message)
-                    }
-                    response.code() == 401 -> {
+                    } else {
+                        // status false — username/password salah
                         _uiState.value = LoginUiState.Error("Username atau password salah.")
                     }
-                    response.code() == 500 -> {
-                        _uiState.value = LoginUiState.Error("Server sedang mengalami gangguan. Coba beberapa saat lagi.")
+                } else {
+                    // Handle error HTTP (401, 500, dsb)
+                    val errorMsg = when (response.code()) {
+                        401 -> "Kredensial tidak valid."
+                        500 -> "Server error. Coba lagi nanti."
+                        else -> "Login gagal (Kode: ${response.code()})"
                     }
-                    else -> {
-                        _uiState.value = LoginUiState.Error("Terjadi kesalahan. Kode: ${response.code()}")
-                    }
+                    _uiState.value = LoginUiState.Error(errorMsg)
                 }
             } catch (e: IOException) {
-                _uiState.value = LoginUiState.Error("Tidak dapat terhubung ke server. Periksa koneksi internet Anda.")
+                _uiState.value = LoginUiState.Error("Koneksi gagal. Periksa internet Anda.")
             } catch (e: Exception) {
-                _uiState.value = LoginUiState.Error("Terjadi kesalahan tidak terduga: ${e.localizedMessage}")
+                _uiState.value = LoginUiState.Error("Terjadi kesalahan: ${e.localizedMessage}")
             }
         }
     }
@@ -66,10 +65,6 @@ class LoginViewModel(
             }
             password.isBlank() -> {
                 _uiState.value = LoginUiState.Error("Password tidak boleh kosong.")
-                false
-            }
-            password.length < 6 -> {
-                _uiState.value = LoginUiState.Error("Password minimal 6 karakter.")
                 false
             }
             else -> true
