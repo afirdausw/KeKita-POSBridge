@@ -1,0 +1,23 @@
+# Build output
+/build
+
+# Generated files
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Keystore (jangan di-commit ke repo!)
+*.jks
+*.keystore
+release.properties
+keystore.properties
+
+# Proguard / R8
+/proguard/
+
+# Android Studio / IntelliJ
+*.iml
+
+# Kotlin code generation
+/generated/
