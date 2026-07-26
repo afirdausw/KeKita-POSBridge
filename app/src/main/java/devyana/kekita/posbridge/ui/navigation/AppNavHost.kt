@@ -3,6 +3,7 @@ package devyana.kekita.posbridge.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -12,7 +13,7 @@ import devyana.kekita.posbridge.data.repository.OutletRepository
 import devyana.kekita.posbridge.ui.accesscode.AccessCodeScreen
 import devyana.kekita.posbridge.ui.accesscode.AccessCodeViewModel
 import devyana.kekita.posbridge.ui.accesscode.AccessCodeViewModelFactory
-import devyana.kekita.posbridge.ui.home.HomeScreen
+import devyana.kekita.posbridge.ui.dashboard.MainDashboardScreen
 import devyana.kekita.posbridge.ui.home.HomeViewModel
 import devyana.kekita.posbridge.ui.home.HomeViewModelFactory
 import devyana.kekita.posbridge.ui.login.LoginScreen
@@ -67,21 +68,21 @@ fun AppNavHost(
             )
         }
 
-        // ─── Home ─────────────────────────────────────────────────────────────
+        // ─── Main Dashboard POS (Static Sidebar Shell + Dynamic Content) ──────
         composable(Screen.Home.route) {
-            val factory = HomeViewModelFactory(authRepository, outletRepository)
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val posPreferenceManager = remember { devyana.kekita.posbridge.utils.PosPreferenceManager(context) }
+            val factory = HomeViewModelFactory(authRepository, outletRepository, posPreferenceManager)
             val viewModel: HomeViewModel = viewModel(factory = factory)
 
-            HomeScreen(
-                viewModel = viewModel,
+            MainDashboardScreen(
+                homeViewModel = viewModel,
                 onLogoutAccount = {
-                    // Logout akun → kembali ke Login, outlet masih ada
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
                 },
                 onLogoutSystem = {
-                    // Logout sistem → kembali ke AccessCode, semua direset
                     navController.navigate(Screen.AccessCode.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }

@@ -2,6 +2,16 @@ package devyana.kekita.posbridge.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
+// ─── KeKita POS Palette (Sesuai Referensi UI Modern & Dark Sidebar) ───────────
+val PosSidebarBg         = Color(0xFF141416)   // Latar belakang sidebar gelap charcoal
+val PosLimeActive        = Color(0xFF84CC16)   // Hijau lime aktif khas POS
+val PosLimeActiveIcon    = Color(0xFF141416)   // Icon pekat di dalam pill lime aktif
+val PosInactiveIcon      = Color(0xFF71717A)   // Icon Muted saat tidak aktif
+val PosSidebarDivider    = Color(0xFF27272A)   // Garis pemisah di sidebar
+val PosContentBg         = Color(0xFFF1F5F9)   // Latar belakang konten (agak abu-abu lembut)
+val PosCardBg            = Color(0xFFFFFFFF)   // Latar belakang kartu produk / surface
+val PosTableKhaki        = Color(0xFFC5C3A5)   // Highlight meja terpilih
+
 // ─── KeKita Light Theme ───────────────────────────────────────────────────────
 val KeKitaPrimary        = Color(0xFF1D4ED8)   // biru utama
 val KeKitaPrimaryLight   = Color(0xFF3B82F6)   // biru terang
@@ -19,6 +29,7 @@ val KeKitaTextDisabled   = Color(0xFFD1D5DB)   // teks disabled
 val KeKitaError          = Color(0xFFDC2626)   // merah error
 val KeKitaErrorContainer = Color(0xFFFEE2E2)   // bg error ringan
 val KeKitaSuccess        = Color(0xFF059669)   // hijau sukses
+val KeKitaSuccessContainer = Color(0xFFDFF0D4) // bg sukses ringan
 
 // ─── KeKita Dark Theme ────────────────────────────────────────────────────────
 val KeKitaDarkPrimary        = Color(0xFF60A5FA)   // biru lebih terang (kontras di gelap)
@@ -36,8 +47,10 @@ val KeKitaDarkTextSecondary  = Color(0xFF94A3B8)   // teks slate-400
 val KeKitaDarkError          = Color(0xFFF87171)   // merah-400
 val KeKitaDarkErrorContainer = Color(0xFF7F1D1D)   // merah gelap
 val KeKitaDarkOnErrorContainer = Color(0xFFFECACA) // merah muda
+val KeKitaDarkSuccess        = Color(0xFF34D399)   // hijau sukses gelap
+val KeKitaDarkSuccessContainer = Color(0xFF064E3B) // bg sukses gelap
 
-// ─── Material defaults (tetap dibutuhkan jika referensi lama ada) ─────────────
+// ─── Material defaults ────────────────────────────────────────────────────────
 val Purple80    = Color(0xFFD0BCFF)
 val PurpleGrey80 = Color(0xFFCCC2DC)
 val Pink80      = Color(0xFFEFB8C8)

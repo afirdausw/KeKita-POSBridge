@@ -1,0 +1,141 @@
+package devyana.kekita.posbridge.ui.dashboard
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import devyana.kekita.posbridge.ui.checker.CheckerScreenContent
+import devyana.kekita.posbridge.ui.components.LogoutDialog
+import devyana.kekita.posbridge.ui.components.PosSidebar
+import devyana.kekita.posbridge.ui.home.HomeScreenContent
+import devyana.kekita.posbridge.ui.home.HomeViewModel
+import devyana.kekita.posbridge.ui.navigation.Screen
+import devyana.kekita.posbridge.ui.payment.PaymentScreenContent
+import devyana.kekita.posbridge.ui.product.ProductScreenContent
+import devyana.kekita.posbridge.ui.report.ReportScreenContent
+import devyana.kekita.posbridge.ui.theme.PosContentBg
+import devyana.kekita.posbridge.ui.theme.PosSidebarBg
+import devyana.kekita.posbridge.ui.transaction.TransactionScreenContent
+
+private val menuRouteOrder = listOf(
+    Screen.Home.route,
+    Screen.Transaction.route,
+    Screen.Product.route,
+    Screen.Report.route,
+    Screen.Payment.route,
+    Screen.Checker.route
+)
+
+@Composable
+fun MainDashboardScreen(
+    homeViewModel: HomeViewModel,
+    onLogoutAccount: () -> Unit,
+    onLogoutSystem: () -> Unit
+) {
+    var currentRoute by remember { mutableStateOf(Screen.Home.route) }
+    var showLogoutAccountDialog by remember { mutableStateOf(false) }
+
+    if (showLogoutAccountDialog) {
+        LogoutDialog(
+            title = "Logout Akun",
+            message = "Yakin ingin keluar dari akun ini? Outlet tetap terkonfigurasi.",
+            confirmText = "Ya, Logout",
+            onDismiss = { showLogoutAccountDialog = false },
+            onConfirm = {
+                showLogoutAccountDialog = false
+                homeViewModel.logoutAccount()
+                onLogoutAccount()
+            }
+        )
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(PosSidebarBg)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+    ) {
+        // Sidebar tetap stay di sebelah kiri (Dark theme token)
+        PosSidebar(
+            currentRoute = currentRoute,
+            onNavigateToRoute = { newRoute -> currentRoute = newRoute },
+            onLogoutAccount = { showLogoutAccountDialog = true },
+            onLogoutSystem = onLogoutSystem
+        )
+
+        // Floating Content Card (Overlapping Sidebar dengan rounded topStart & bottomStart 24.dp)
+        Surface(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp),
+            color = PosContentBg
+        ) {
+            // Animasi Directional Vertical Slide ringan & responsif tanpa lag
+            AnimatedContent(
+                targetState = currentRoute,
+                transitionSpec = {
+                    val initialIndex = menuRouteOrder.indexOf(initialState).let { if (it == -1) 0 else it }
+                    val targetIndex = menuRouteOrder.indexOf(targetState).let { if (it == -1) 0 else it }
+
+                    if (targetIndex > initialIndex) {
+                        // Pindah ke menu bawah -> Slide masuk dari bawah ke atas
+                        (slideInVertically(
+                            animationSpec = tween(180),
+                            initialOffsetY = { fullHeight -> fullHeight / 5 }
+                        ) + fadeIn(tween(150))) togetherWith (
+                            slideOutVertically(
+                                animationSpec = tween(180),
+                                targetOffsetY = { fullHeight -> -fullHeight / 5 }
+                            ) + fadeOut(tween(150))
+                        )
+                    } else {
+                        // Pindah ke menu atas -> Slide masuk dari atas ke bawah
+                        (slideInVertically(
+                            animationSpec = tween(180),
+                            initialOffsetY = { fullHeight -> -fullHeight / 5 }
+                        ) + fadeIn(tween(150))) togetherWith (
+                            slideOutVertically(
+                                animationSpec = tween(180),
+                                targetOffsetY = { fullHeight -> fullHeight / 5 }
+                            ) + fadeOut(tween(150))
+                        )
+                    }
+                },
+                label = "DirectionalTabSlide"
+            ) { targetRoute ->
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when (targetRoute) {
+                        Screen.Home.route -> HomeScreenContent(viewModel = homeViewModel)
+                        Screen.Transaction.route -> TransactionScreenContent()
+                        Screen.Product.route -> ProductScreenContent()
+                        Screen.Report.route -> ReportScreenContent()
+                        Screen.Payment.route -> PaymentScreenContent()
+                        Screen.Checker.route -> CheckerScreenContent()
+                        else -> HomeScreenContent(viewModel = homeViewModel)
+                    }
+                }
+            }
+        }
+    }
+}
