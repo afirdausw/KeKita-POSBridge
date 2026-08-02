@@ -1,5 +1,8 @@
 package devyana.kekita.posbridge.ui.dashboard
 
+import android.app.Activity
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -18,10 +21,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import devyana.kekita.posbridge.ui.checker.CheckerScreenContent
 import devyana.kekita.posbridge.ui.components.LogoutDialog
@@ -51,8 +56,28 @@ fun MainDashboardScreen(
     onLogoutAccount: () -> Unit,
     onLogoutSystem: () -> Unit
 ) {
+    val context = LocalContext.current
+    val activity = context as? Activity
     var currentRoute by remember { mutableStateOf(Screen.Home.route) }
     var showLogoutAccountDialog by remember { mutableStateOf(false) }
+    var backPressedTime by remember { mutableLongStateOf(0L) }
+
+    // Handing Double Back Press & Tab Navigation
+    BackHandler {
+        if (currentRoute != Screen.Home.route) {
+            // Kembali ke halaman utama POS jika sedang di tab lain
+            currentRoute = Screen.Home.route
+        } else {
+            // Jika sudah di POS Utama, minta konfirmasi klik back sekali lagi untuk keluar
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - backPressedTime < 2000) {
+                activity?.finish()
+            } else {
+                backPressedTime = currentTime
+                Toast.makeText(context, "Tekan sekali lagi untuk keluar dari aplikasi", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     if (showLogoutAccountDialog) {
         LogoutDialog(
@@ -126,7 +151,10 @@ fun MainDashboardScreen(
             ) { targetRoute ->
                 Box(modifier = Modifier.fillMaxSize()) {
                     when (targetRoute) {
-                        Screen.Home.route -> HomeScreenContent(viewModel = homeViewModel)
+                        Screen.Home.route -> HomeScreenContent(
+                            viewModel = homeViewModel,
+                            onNavigateToPayment = { currentRoute = Screen.Payment.route }
+                        )
                         Screen.Transaction.route -> TransactionScreenContent()
                         Screen.Product.route -> ProductScreenContent()
                         Screen.Report.route -> ReportScreenContent()

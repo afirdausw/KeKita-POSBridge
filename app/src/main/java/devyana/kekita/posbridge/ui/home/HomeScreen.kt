@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -24,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -44,6 +46,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
@@ -63,14 +67,26 @@ import devyana.kekita.posbridge.ui.components.ActionCircleButton
 import devyana.kekita.posbridge.ui.components.DashedDivider
 import devyana.kekita.posbridge.ui.components.PosHeader
 import devyana.kekita.posbridge.ui.components.SummaryRow
+import devyana.kekita.posbridge.ui.components.dashedBorder
 
 @Composable
 fun HomeScreenContent(
-    viewModel: HomeViewModel
+    viewModel: HomeViewModel,
+    onNavigateToPayment: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val colorScheme = MaterialTheme.colorScheme
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
+
+    // Dialog Sukses Pesanan
+    if (uiState.showOrderSuccessDialog) {
+        OrderSuccessDialog(
+            message = uiState.orderSuccessMessage,
+            onDismiss = viewModel::dismissOrderSuccessDialog,
+            onNavigateToPayment = onNavigateToPayment
+        )
+    }
 
     // Modal Popup Variant produk
     uiState.selectedProductForVariant?.let { product ->
@@ -171,7 +187,16 @@ fun HomeScreenContent(
             onRemoveItem = viewModel::removeCartItem,
             onClearCart = viewModel::clearCart,
             onOpenNote = viewModel::openNoteDialog,
-            onProcessOrder = viewModel::processOrder,
+            onProcessOrder = {
+                if (uiState.cartItems.isEmpty()) {
+                    return@OrderPanel
+                }
+                if (uiState.confirmedTable == null) {
+                    Toast.makeText(context, "Silakan tentukan meja terlebih dahulu", Toast.LENGTH_SHORT).show()
+                    return@OrderPanel
+                }
+                viewModel.processOrder()
+            },
             modifier = Modifier
                 .width(360.dp)
                 .fillMaxHeight()
@@ -189,6 +214,7 @@ private fun PosSearchAndTableBar(
     onTableClick: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val focusManager = LocalFocusManager.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -245,7 +271,10 @@ private fun PosSearchAndTableBar(
                         modifier = Modifier
                             .size(24.dp)
                             .clip(CircleShape)
-                            .clickable { onQueryChange("") },
+                            .clickable {
+                                onQueryChange("")
+                                focusManager.clearFocus()
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -327,12 +356,6 @@ private fun CategoryFilterRow(
             color = colorScheme.onSurfaceVariant,
             fontSize = 11.sp
         )
-
-        Spacer(modifier = Modifier.width(6.dp))
-
-        RoundIconButton(iconRes = R.drawable.ic_lucide_chevron_left, enabled = false)
-        Spacer(modifier = Modifier.width(4.dp))
-        RoundIconButton(iconRes = R.drawable.ic_lucide_chevron_right, enabled = true)
     }
 }
 
@@ -412,6 +435,7 @@ private fun ProductGrid(
             LazyVerticalGrid(
                 columns = GridCells.Fixed(columns),
                 modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -821,18 +845,26 @@ private fun TableSelectionOffcanvas(
                         columns = GridCells.Fixed(7),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.height(240.dp)
+                        modifier = Modifier.height(250.dp)
                     ) {
                         items(tables, key = { it.id }) { table ->
                             val isSelected = table.id == tempSelectedTable?.id
+                            val cardModifier = if (isSelected) {
+                                Modifier
+                                    .height(70.dp)
+                                    .clickable { onSelectTempTable(table) }
+                            } else {
+                                Modifier
+                                    .height(70.dp)
+                                    .dashedBorder(color = Color(0xFFCBD5E1), cornerRadius = 12.dp)
+                                    .clickable { onSelectTempTable(table) }
+                            }
+
                             Surface(
-                                modifier = Modifier
-                                    .height(64.dp)
-                                    .clickable { onSelectTempTable(table) },
+                                modifier = cardModifier,
                                 shape = RoundedCornerShape(12.dp),
                                 color = if (isSelected) Color(0xFFB5B396) else Color.White,
-                                border = if (isSelected) BorderStroke(1.dp, Color(0xFF6B6850))
-                                else BorderStroke(1.dp, Color(0xFFE2E8F0))
+                                border = if (isSelected) BorderStroke(1.dp, Color(0xFF6B6850)) else null
                             ) {
                                 Column(
                                     modifier = Modifier
@@ -997,12 +1029,12 @@ private fun OrderPanel(
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = 16.dp)
                 ) {
-                    items(uiState.cartItems, key = { it.id }) { item ->
+                    itemsIndexed(uiState.cartItems, key = { _, item -> item.id }) { index, item ->
                         CartItemRow(
                             item = item,
+                            showDivider = index < uiState.cartItems.lastIndex,
                             onIncrement = { onIncrement(item.id) },
                             onDecrement = { onDecrement(item.id) },
                             onRemove = { onRemoveItem(item.id) },
@@ -1069,6 +1101,7 @@ private fun EmptyOrder(modifier: Modifier = Modifier) {
 @Composable
 private fun CartItemRow(
     item: CartItem,
+    showDivider: Boolean = true,
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
     onRemove: () -> Unit,
@@ -1106,7 +1139,6 @@ private fun CartItemRow(
         )
 
         if (hasNote) {
-            Spacer(modifier = Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_lucide_file_text),
@@ -1189,12 +1221,13 @@ private fun CartItemRow(
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        DashedDivider(
-            color = colorScheme.outline.copy(alpha = 0.5f),
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (showDivider) {
+            Spacer(modifier = Modifier.height(12.dp))
+            DashedDivider(
+                color = colorScheme.outline.copy(alpha = 0.8f),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
@@ -1245,4 +1278,123 @@ private fun OrderSummary(
 
 private fun formatRupiah(value: Int): String {
     return "Rp ${"%,d".format(value).replace(",", ".")}"
+}
+
+@Composable
+private fun OrderSuccessDialog(
+    message: String,
+    onDismiss: () -> Unit,
+    onNavigateToPayment: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+            modifier = Modifier
+                .width(400.dp)
+                .padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Top Green Scalloped Badge Check Icon
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFECFDF5)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_lucide_badge_check),
+                        contentDescription = "Sukses",
+                        tint = Color(0xFF10B981),
+                        modifier = Modifier.size(44.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = message,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF1E293B),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                DashedDivider(
+                    color = Color(0xFFCBD5E1),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFF8FAFC),
+                            contentColor = Color(0xFF64748B)
+                        ),
+                        elevation = null
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_lucide_x),
+                            contentDescription = null,
+                            tint = Color(0xFF64748B),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Tutup",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            onDismiss()
+                            onNavigateToPayment()
+                        },
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .height(44.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFF3E8FF),
+                            contentColor = Color(0xFF8B5CF6)
+                        ),
+                        elevation = null
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_lucide_printer),
+                            contentDescription = null,
+                            tint = Color(0xFF8B5CF6),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Ke Pembayaran",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

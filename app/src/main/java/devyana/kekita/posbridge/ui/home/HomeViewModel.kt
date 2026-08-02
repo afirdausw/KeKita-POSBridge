@@ -82,7 +82,10 @@ data class HomePosUiState(
     val showTableOffcanvas: Boolean = false,
     val tables: List<TableItem> = emptyList(),
     val tempSelectedTable: TableItem? = null,
-    val confirmedTable: TableItem? = null
+    val confirmedTable: TableItem? = null,
+    // Order success dialog state
+    val showOrderSuccessDialog: Boolean = false,
+    val orderSuccessMessage: String = ""
 ) {
     val filteredProducts: List<PosProduct>
         get() = products.filter { product ->
@@ -359,10 +362,41 @@ class HomeViewModel(
         }
     }
 
-    fun processOrder() {
+    fun processOrder(): Boolean {
+        val state = _uiState.value
+        if (state.cartItems.isEmpty()) return false
+        if (state.confirmedTable == null) return false
+
+        val hasDrink = state.cartItems.any {
+            it.product.category in listOf("Minuman", "Beer", "Black Coffee Based", "Hot Drinks", "Milk Based", "Sparkling & Juice")
+        }
+        val hasFood = state.cartItems.any {
+            it.product.category in listOf("Makanan", "Adds On", "Asian", "Delivery", "Indonesian Hype", "Snack")
+        } || (!hasDrink)
+
+        val destinationText = when {
+            hasDrink && hasFood -> "bar & dapur"
+            hasDrink -> "bar"
+            else -> "dapur"
+        }
+
+        val message = "Yeay, pesanan telah berhasil dikirim ke $destinationText"
+
+        _uiState.update {
+            it.copy(
+                showOrderSuccessDialog = true,
+                orderSuccessMessage = message
+            )
+        }
+        return true
+    }
+
+    fun dismissOrderSuccessDialog() {
         posPreferenceManager.clearActivePosData()
         _uiState.update { state ->
             state.copy(
+                showOrderSuccessDialog = false,
+                orderSuccessMessage = "",
                 cartItems = emptyList(),
                 confirmedTable = null,
                 tempSelectedTable = null,
