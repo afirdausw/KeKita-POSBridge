@@ -1,5 +1,12 @@
 package devyana.kekita.posbridge.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image as ComposeImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -7,7 +14,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -16,10 +22,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import devyana.kekita.posbridge.R
@@ -29,6 +41,23 @@ import devyana.kekita.posbridge.ui.theme.PosLimeActive
 import devyana.kekita.posbridge.ui.theme.PosLimeActiveIcon
 import devyana.kekita.posbridge.ui.theme.PosSidebarBg
 import devyana.kekita.posbridge.ui.theme.PosSidebarDivider
+import kotlinx.coroutines.delay
+
+enum class LiveSyncState(
+    val label: String,
+    val iconRes: Int,
+    val color: Color,
+    val durationMs: Long,
+    val isRotating: Boolean = false,
+    val isPulsing: Boolean = false
+) {
+    CONNECTING("connection", R.drawable.ic_lucide_wifi, Color(0xFFF59E0B), 3000L, isPulsing = true),
+    SYNCING_1("sync to server", R.drawable.ic_lucide_refresh_cw, Color(0xFF06B6D4), 3000L, isRotating = true),
+    CONNECTED("connected", R.drawable.ic_lucide_cloud_check, Color(0xFF10B981), 5000L),
+    IDLE("idle", R.drawable.ic_lucide_server, Color(0xFF94A3B8), 3000L),
+    SYNCING_2("sync to server", R.drawable.ic_lucide_refresh_cw, Color(0xFF06B6D4), 3000L, isRotating = true),
+    DISCONNECTED("disconnect", R.drawable.ic_lucide_wifi_off, Color(0xFFEF4444), 5000L, isPulsing = true)
+}
 
 @Composable
 fun PosSidebar(
@@ -133,6 +162,10 @@ fun PosSidebar(
         // Flexible Space to Bottom
         Spacer(modifier = Modifier.weight(1f))
 
+        // ─── LIVE SERVER SYNC STATUS INDICATOR (SIMULASI SERVER SYNC) ──────────
+        ServerSyncStatusWidget()
+        Spacer(modifier = Modifier.height(12.dp))
+
         // Line Divider Spasi Bottom
         Box(
             modifier = Modifier
@@ -151,6 +184,85 @@ fun PosSidebar(
             inactiveIconColor = Color(0xFFEF4444),
             contentDescription = "Logout Akun",
             onClick = onLogoutAccount
+        )
+    }
+}
+
+@Composable
+private fun ServerSyncStatusWidget(
+    modifier: Modifier = Modifier
+) {
+    var currentIndex by remember { mutableIntStateOf(0) }
+    val states = LiveSyncState.entries
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            val current = states[currentIndex]
+            delay(current.durationMs)
+            currentIndex = (currentIndex + 1) % states.size
+        }
+    }
+
+    val currentState = states[currentIndex]
+
+    // Continuous rotation transition for Syncing state
+    val infiniteTransition = rememberInfiniteTransition(label = "SyncAnimation")
+    val rotationAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+
+    // Breathing pulse opacity transition for Connecting / Disconnected states
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(700, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    val currentAlpha = if (currentState.isPulsing) pulseAlpha else 0.85f
+
+    Box(
+        modifier = modifier.size(44.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Inner Circle Backdrop
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(currentState.color.copy(alpha = 0.12f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = currentState.iconRes),
+                contentDescription = currentState.label,
+                tint = currentState.color.copy(alpha = currentAlpha),
+                modifier = Modifier
+                    .size(20.dp)
+                    .graphicsLayer {
+                        if (currentState.isRotating) {
+                            rotationZ = rotationAngle
+                        }
+                    }
+            )
+        }
+
+        // Subtle status dot at top right (Unclipped, with subtle border ring)
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(PosSidebarBg, CircleShape)
+                .padding(1.dp)
+                .background(currentState.color.copy(alpha = currentAlpha), CircleShape)
+                .align(Alignment.TopEnd)
         )
     }
 }

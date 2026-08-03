@@ -41,7 +41,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,6 +70,8 @@ import devyana.kekita.posbridge.ui.components.DashedDivider
 import devyana.kekita.posbridge.ui.components.PosHeader
 import devyana.kekita.posbridge.ui.components.SummaryRow
 import devyana.kekita.posbridge.ui.components.dashedBorder
+import devyana.kekita.posbridge.ui.payment.components.CheckoutPaymentItem
+import devyana.kekita.posbridge.ui.payment.components.CheckoutPaymentModal
 
 @Composable
 fun HomeScreenContent(
@@ -79,12 +83,51 @@ fun HomeScreenContent(
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
 
+    var showCheckoutModal by remember { mutableStateOf(false) }
+
     // Dialog Sukses Pesanan
     if (uiState.showOrderSuccessDialog) {
         OrderSuccessDialog(
             message = uiState.orderSuccessMessage,
             onDismiss = viewModel::dismissOrderSuccessDialog,
-            onNavigateToPayment = onNavigateToPayment
+            onNavigateToPayment = {
+                showCheckoutModal = true
+            }
+        )
+    }
+
+    // Modal Checkout Pembayaran
+    if (showCheckoutModal) {
+        val checkoutItems = remember(uiState.cartItems) {
+            uiState.cartItems.map {
+                CheckoutPaymentItem(
+                    id = it.id,
+                    qty = it.quantity,
+                    name = it.product.name,
+                    variant = it.selectedVariant,
+                    unitPrice = it.product.price
+                )
+            }
+        }
+        CheckoutPaymentModal(
+            invoiceNo = uiState.invoiceNumber,
+            tableNo = uiState.confirmedTable?.name ?: "-",
+            items = checkoutItems.ifEmpty {
+                listOf(
+                    CheckoutPaymentItem("1", 1, "Soto Ayam", null, 35_000),
+                    CheckoutPaymentItem("2", 1, "Steam rice", null, 8_000),
+                    CheckoutPaymentItem("3", 1, "Aqua 600ml", null, 6_000),
+                    CheckoutPaymentItem("4", 1, "Eggs", "OMELETE", 15_000)
+                )
+            },
+            onDismiss = {
+                showCheckoutModal = false
+                viewModel.dismissOrderSuccessDialog()
+            },
+            onPaymentSuccess = {
+                showCheckoutModal = false
+                viewModel.dismissOrderSuccessDialog()
+            }
         )
     }
 
@@ -1381,7 +1424,7 @@ private fun OrderSuccessDialog(
                         elevation = null
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_lucide_printer),
+                            painter = painterResource(id = R.drawable.ic_lucide_arrow_right),
                             contentDescription = null,
                             tint = Color(0xFF8B5CF6),
                             modifier = Modifier.size(16.dp)
