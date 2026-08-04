@@ -158,7 +158,9 @@ fun MainDashboardScreen(
                         Screen.Transaction.route -> TransactionScreenContent()
                         Screen.Product.route -> ProductScreenContent()
                         Screen.Report.route -> ReportScreenContent()
-                        Screen.Payment.route -> PaymentScreenContent()
+                        Screen.Payment.route -> PaymentScreenContent(
+                            onNavigateToPos = { currentRoute = Screen.Home.route }
+                        )
                         Screen.Checker.route -> CheckerScreenContent()
                         else -> HomeScreenContent(viewModel = homeViewModel)
                     }

@@ -85,7 +85,8 @@ data class CheckoutPaymentItem(
     val qty: Int,
     val name: String,
     val variant: String? = null,
-    val unitPrice: Int
+    val unitPrice: Int,
+    val note: String? = null
 ) {
     val totalOriginal: Int = unitPrice * qty
 }
@@ -258,11 +259,11 @@ fun CheckoutPaymentModal(
         ) {
             // SINGLE UNIFIED LARGE MODAL CARD WITH 2 PANELS SIDE-BY-SIDE
             Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
                 modifier = Modifier
                     .width(880.dp)
-                    .height(550.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White
+                    .height(570.dp)
             ) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     // ─── LEFT PANEL: TABLE INFO, TOGGLE & SCROLLABLE ITEM LIST ─────
@@ -270,7 +271,7 @@ fun CheckoutPaymentModal(
                         modifier = Modifier
                             .weight(1.1f)
                             .fillMaxHeight()
-                            .padding(18.dp)
+                            .padding(16.dp)
                     ) {
                         // Header Table & Items count
                         Row(
@@ -286,7 +287,6 @@ fun CheckoutPaymentModal(
 
                         Spacer(modifier = Modifier.height(10.dp))
                         DashedDivider(color = Color(0xFFE2E8F0), modifier = Modifier.fillMaxWidth())
-                        Spacer(modifier = Modifier.height(10.dp))
 
                         // Switch Diskon Per Item / Pilih Item Split Bill (RESETS DISCOUNTS ON TOGGLE OFF)
                         Row(
@@ -323,7 +323,6 @@ fun CheckoutPaymentModal(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
                         DashedDivider(color = Color(0xFFE2E8F0), modifier = Modifier.fillMaxWidth())
                         Spacer(modifier = Modifier.height(10.dp))
 
@@ -435,11 +434,11 @@ fun CheckoutPaymentModal(
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Medium,
                                                     lineHeight = 13.sp,
-                                                    color = Color(0xFF64748B),
+                                                    color = if (isPaidAlready) Color(0xFFCBD5E1) else if (isChecked) Color(0xFF64748B) else Color(0xFF94A3B8),
                                                     style = TextStyle(
                                                         platformStyle = PlatformTextStyle(includeFontPadding = false)
                                                     ),
-                                                    modifier = Modifier.padding(top = 3.dp)
+                                                    modifier = Modifier.padding(top = 5.dp)
                                                 )
                                             }
                                         }
@@ -571,7 +570,7 @@ fun CheckoutPaymentModal(
                         modifier = Modifier
                             .weight(1.2f)
                             .fillMaxHeight()
-                            .padding(18.dp)
+                            .padding(16.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
                         // Header Invoice + Close Button (The ONLY way to close modal!)
@@ -581,7 +580,7 @@ fun CheckoutPaymentModal(
                         ) {
                             Text(
                                 text = invoiceNo,
-                                fontSize = 18.sp,
+                                fontSize = 17.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF475569)
                             )
@@ -601,34 +600,35 @@ fun CheckoutPaymentModal(
 
                         // SUMMARY BREAKDOWN
                         PaymentRow(label = "Subtotal :", value = formatRupiah(rawSubtotal))
-                        Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         PaymentRow(
                             label = "Potongan :",
                             value = formatRupiah(potongan),
                             valueColor = Color(0xFF1E293B),
                             isDashedUnderline = true
                         )
-                        Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         PaymentRow(label = "Diskon Item :", value = formatRupiah(itemDiscountTotal))
-                        Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         PaymentRow(label = "Service (5%) :", value = formatRupiah(serviceTax))
-                        Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         PaymentRow(label = "PPN (10%) :", value = formatRupiah(ppnTax))
-                        Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         PaymentRow(label = "Total :", value = formatRupiah(calculatedTotal), isBold = true)
-                        Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         PaymentRow(label = "Pembulatan :", value = formatRupiah(pembulatan))
-                        Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         PaymentRow(
                             label = "Total yg Harus dibayar :",
                             value = formatRupiah(totalToPay),
                             isExtraBold = true,
-                            fontSize = 16.sp
+                            fontSize = 15.sp,
+                            valueColor = Color(0xFF2563EB)
                         )
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
                         DashedDivider(color = Color(0xFFCBD5E1), modifier = Modifier.fillMaxWidth())
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
                         // BILL MODE PILLS (NORMAL | SPLIT BILL)
                         Row(
@@ -691,7 +691,7 @@ fun CheckoutPaymentModal(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
                         DashedDivider(color = Color(0xFFCBD5E1), modifier = Modifier.fillMaxWidth())
                         Spacer(modifier = Modifier.height(10.dp))
 
@@ -759,7 +759,7 @@ fun CheckoutPaymentModal(
 
                         Spacer(modifier = Modifier.height(10.dp))
                         DashedDivider(color = Color(0xFFCBD5E1), modifier = Modifier.fillMaxWidth())
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
                         // CONFIRM PAYMENT BUTTON (NOMINAL APPEARS ONLY WHEN PAYMENT METHOD / CASH SUGGESTION IS CLICKED!)
                         val isPaymentReady = isAnyItemCheckedInSplit && totalToPay > 0 && paidAmount > 0
@@ -1223,7 +1223,7 @@ private fun PaymentRow(
     value: String,
     isBold: Boolean = false,
     isExtraBold: Boolean = false,
-    fontSize: androidx.compose.ui.unit.TextUnit = 13.sp,
+    fontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
     valueColor: Color = Color(0xFF1E293B),
     isDashedUnderline: Boolean = false
 ) {
@@ -1231,13 +1231,13 @@ private fun PaymentRow(
         Text(
             text = label,
             fontSize = fontSize,
-            fontWeight = if (isExtraBold) FontWeight.ExtraBold else if (isBold) FontWeight.Bold else FontWeight.Medium,
-            color = Color(0xFF475569)
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFF64748B)
         )
         Spacer(modifier = Modifier.weight(1f))
         Text(
             text = value,
-            fontSize = fontSize,
+            fontSize = if (isExtraBold) fontSize else 12.5.sp,
             fontWeight = if (isExtraBold) FontWeight.ExtraBold else if (isBold) FontWeight.Bold else FontWeight.Bold,
             color = valueColor,
             textDecoration = if (isDashedUnderline) TextDecoration.Underline else TextDecoration.None

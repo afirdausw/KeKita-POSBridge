@@ -47,11 +47,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -186,7 +188,7 @@ fun HomeScreenContent(
                 outletName = uiState.homeData?.outletName ?: "KeKita"
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             PosSearchAndTableBar(
                 query = uiState.searchQuery,
@@ -198,7 +200,7 @@ fun HomeScreenContent(
                 }
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             CategoryFilterRow(
                 categories = uiState.categories,
@@ -210,7 +212,7 @@ fun HomeScreenContent(
                 }
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             ProductGrid(
                 products = uiState.filteredProducts,
@@ -258,6 +260,8 @@ private fun PosSearchAndTableBar(
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val focusManager = LocalFocusManager.current
+    var isSearchFocused by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -268,7 +272,10 @@ private fun PosSearchAndTableBar(
                 .height(46.dp),
             shape = RoundedCornerShape(12.dp),
             color = colorScheme.surface,
-            border = BorderStroke(1.dp, colorScheme.outline.copy(alpha = 0.5f))
+            border = BorderStroke(
+                if (isSearchFocused) 1.5.dp else 1.dp,
+                if (isSearchFocused) Color(0xFF2563EB) else Color(0xFFE2E8F0)
+            )
         ) {
             Row(
                 modifier = Modifier
@@ -279,7 +286,7 @@ private fun PosSearchAndTableBar(
                 Icon(
                     painter = painterResource(id = R.drawable.ic_lucide_search),
                     contentDescription = null,
-                    tint = colorScheme.onSurfaceVariant,
+                    tint = Color.Gray,
                     modifier = Modifier.size(18.dp)
                 )
 
@@ -292,20 +299,24 @@ private fun PosSearchAndTableBar(
                     if (query.isEmpty()) {
                         Text(
                             text = "Cari Produk",
-                            color = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            fontSize = 13.sp
+                            color = Color(0xFF94A3B8),
+                            fontSize = 13.sp,
+                            style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
                         )
                     }
                     BasicTextField(
                         value = query,
                         onValueChange = onQueryChange,
                         singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { isSearchFocused = it.isFocused },
                         textStyle = TextStyle(
                             color = colorScheme.onSurface,
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                            fontWeight = FontWeight.Medium,
+                            platformStyle = PlatformTextStyle(includeFontPadding = false)
+                        )
                     )
                 }
 
@@ -323,7 +334,7 @@ private fun PosSearchAndTableBar(
                         Icon(
                             painter = painterResource(id = R.drawable.ic_lucide_x),
                             contentDescription = "Hapus",
-                            tint = colorScheme.onSurfaceVariant,
+                            tint = Color.Gray,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -339,7 +350,7 @@ private fun PosSearchAndTableBar(
                 .clickable(onClick = onTableClick),
             shape = RoundedCornerShape(12.dp),
             color = colorScheme.surface,
-            border = BorderStroke(1.dp, colorScheme.outline.copy(alpha = 0.5f))
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 14.dp),
@@ -349,14 +360,14 @@ private fun PosSearchAndTableBar(
                 Icon(
                     painter = painterResource(id = R.drawable.ic_lucide_armchair),
                     contentDescription = "Tentukan Meja",
-                    tint = colorScheme.onSurfaceVariant,
+                    tint = if (confirmedTable != null) Color(0xFF2563EB) else colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
                 if (confirmedTable != null) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = confirmedTable.name,
-                        color = colorScheme.onSurfaceVariant,
+                        color = Color(0xFF2563EB),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -410,13 +421,13 @@ private fun CategoryChip(
 ) {
     Surface(
         modifier = Modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(8.dp),
         color = if (selected) Color(0xFF2563EB) else Color(0xFFDBEAFE),
         contentColor = if (selected) Color.White else Color(0xFF1D4ED8)
     ) {
         Text(
             text = text,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 1.dp),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1
@@ -447,7 +458,7 @@ private fun ProductGrid(
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
-                        .background(colorScheme.outline.copy(alpha = 0.15f)),
+                        .background(Color(0xFFE2E8F0)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
