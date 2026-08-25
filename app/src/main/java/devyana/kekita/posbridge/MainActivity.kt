@@ -33,6 +33,11 @@ class MainActivity : ComponentActivity() {
             sessionManager = sessionManager
         )
 
+        val productRepository = devyana.kekita.posbridge.data.repository.ProductRepository(
+            productDao = devyana.kekita.posbridge.data.local.database.AppDatabase.getInstance(applicationContext).productDao(),
+            outletManager = outletManager
+        )
+
         // ─── Tentukan start destination ───────────────────────────────────────
         // Jika outlet belum dikonfigurasi → AccessCode (Step 1)
         // Jika sudah dikonfigurasi tapi belum login → Login (Step 2)
@@ -51,7 +56,8 @@ class MainActivity : ComponentActivity() {
                     navController = navController,
                     startDestination = startDestination,
                     outletRepository = outletRepository,
-                    authRepository = authRepository
+                    authRepository = authRepository,
+                    productRepository = productRepository
                 )
             }
         }

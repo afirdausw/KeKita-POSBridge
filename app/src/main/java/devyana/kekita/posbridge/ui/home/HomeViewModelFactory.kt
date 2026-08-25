@@ -9,13 +9,14 @@ import devyana.kekita.posbridge.utils.PosPreferenceManager
 class HomeViewModelFactory(
     private val authRepository: AuthRepository,
     private val outletRepository: OutletRepository,
+    private val productRepository: devyana.kekita.posbridge.data.repository.ProductRepository,
     private val posPreferenceManager: PosPreferenceManager
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
-            return HomeViewModel(authRepository, outletRepository, posPreferenceManager) as T
+            return HomeViewModel(authRepository, outletRepository, productRepository, posPreferenceManager) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }

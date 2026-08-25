@@ -47,4 +47,22 @@ class OutletRepository(
     fun getOutletConfig(): OutletManager.OutletConfig? = outletManager.getOutletConfig()
 
     fun clearOutletConfig() = outletManager.clearOutletConfig()
+
+    suspend fun pingServer(): Result<Boolean> {
+        return try {
+            val config = getOutletConfig()
+            if (config?.apiDomain.isNullOrBlank()) {
+                return Result.failure(Exception("No API Domain"))
+            }
+            val api = devyana.kekita.posbridge.data.remote.network.RetrofitClient.createPingApiService(config!!.apiDomain)
+            val res = api.ping()
+            if (res.status == "success" || res.version != null) {
+                Result.success(true)
+            } else {
+                Result.failure(Exception("Invalid ping response"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

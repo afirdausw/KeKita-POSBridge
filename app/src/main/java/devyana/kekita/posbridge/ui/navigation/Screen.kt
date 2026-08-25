@@ -25,4 +25,7 @@ sealed class Screen(val route: String) {
 
     /** Halaman dummy checker kitchen/bar */
     data object Checker : Screen("checker")
+
+    /** Halaman pengaturan (settings) */
+    data object Settings : Screen("settings")
 }

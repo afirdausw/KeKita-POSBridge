@@ -62,6 +62,11 @@ import devyana.kekita.posbridge.R
 import devyana.kekita.posbridge.ui.components.DashedDivider
 import devyana.kekita.posbridge.ui.home.CartItem
 import devyana.kekita.posbridge.ui.payment.components.CheckoutPaymentItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import devyana.kekita.posbridge.ui.payment.components.CheckoutPaymentModal
 import devyana.kekita.posbridge.utils.PosPreferenceManager
 
@@ -103,12 +108,20 @@ data class PaymentTransactionOrder(
 
 @Composable
 fun PaymentScreenContent(
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
     onNavigateToPos: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val colorScheme = MaterialTheme.colorScheme
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    devyana.kekita.posbridge.ui.components.PosPullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
+    ) {
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = Semua, 1 = Belum Dibayar, 2 = Sudah Dibayar
     var searchQuery by remember { mutableStateOf("") }
@@ -439,6 +452,7 @@ fun PaymentScreenContent(
                     )
                 }
             }
+        }
         }
     }
 }

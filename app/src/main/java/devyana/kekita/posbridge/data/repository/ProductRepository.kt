@@ -1,99 +1,78 @@
 package devyana.kekita.posbridge.data.repository
 
+import android.util.Log
 import devyana.kekita.posbridge.data.local.dao.ProductDao
 import devyana.kekita.posbridge.data.local.entity.ProductEntity
-import devyana.kekita.posbridge.data.local.entity.SyncStatus
+import devyana.kekita.posbridge.data.local.entity.ProductVariantEntity
+import devyana.kekita.posbridge.data.remote.network.RetrofitClient
+import devyana.kekita.posbridge.utils.OutletManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import java.util.UUID
+import kotlinx.coroutines.withContext
 
 class ProductRepository(
-    private val productDao: ProductDao
+    private val productDao: ProductDao,
+    private val outletManager: OutletManager
 ) {
-
-    // ─── Observe ───────────────────────────────────────────────────────────────
-
-    fun observeAllProducts(): Flow<List<ProductEntity>> {
-        return productDao.observeAllActiveProducts()
-    }
-
-    fun searchProducts(query: String): Flow<List<ProductEntity>> {
-        return productDao.searchProducts(query)
-    }
-
-    // ─── Read ──────────────────────────────────────────────────────────────────
-
-    suspend fun getProductByUuid(uuid: String): ProductEntity? {
-        return productDao.getProductByUuid(uuid)
-    }
-
-    suspend fun getProductById(id: Long): ProductEntity? {
-        return productDao.getProductById(id)
-    }
-
-    suspend fun getAllActiveProducts(): List<ProductEntity> {
-        return productDao.getAllActiveProducts()
-    }
-
-    suspend fun getPendingSync(): List<ProductEntity> {
-        return productDao.getPendingAndFailedProducts()
-    }
-
-    // ─── Write ─────────────────────────────────────────────────────────────────
-
     /**
-     * Save product locally first. Always assigns a UUID and sets sync_status to PENDING.
-     * Server sync is handled separately by WorkManager.
+     * Local database is the source of truth.
+     * We expose a Flow to the UI.
      */
-    suspend fun saveProduct(product: ProductEntity): Long {
-        val productToSave = product.copy(
-            uuid = product.uuid.ifBlank { UUID.randomUUID().toString() },
-            syncStatus = SyncStatus.PENDING,
-            updatedAt = System.currentTimeMillis()
-        )
-        return productDao.insertProduct(productToSave)
+    fun getAllProducts(): Flow<List<ProductEntity>> {
+        return productDao.getAllProducts()
     }
 
     /**
-     * Update product locally. Marks as PENDING for sync.
+     * Fetch products from API and save to Room.
+     * This supports the Offline-First architecture.
      */
-    suspend fun updateProduct(product: ProductEntity) {
-        val productToUpdate = product.copy(
-            syncStatus = SyncStatus.PENDING,
-            updatedAt = System.currentTimeMillis()
-        )
-        productDao.updateProduct(productToUpdate)
-    }
+    suspend fun syncProducts(): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val apiDomain = outletManager.getApiDomain()
+            if (apiDomain.isNullOrBlank()) {
+                return@withContext Result.failure(Exception("Domain API outlet tidak dikonfigurasi."))
+            }
 
-    /**
-     * Soft delete: marks is_deleted = true and queues for sync.
-     * Records with unsynced data are never permanently removed.
-     */
-    suspend fun deleteProduct(uuid: String) {
-        productDao.softDeleteProduct(
-            uuid = uuid,
-            syncStatus = SyncStatus.PENDING
-        )
-    }
+            val apiService = RetrofitClient.createProductApiService(apiDomain)
+            val response = apiService.getProducts()
 
-    // ─── Sync ──────────────────────────────────────────────────────────────────
+            if (response.status && response.data != null) {
+                // Map network models to local entities
+                val entities = response.data.products.map { item ->
+                    ProductEntity(
+                        idProduk = item.idProduk,
+                        namaProduk = item.namaProduk,
+                        kategori = if (item.kategori.isBlank()) "Tanpa Kategori" else item.kategori,
+                        jenisProduk = item.jenisProduk ?: "Makanan",
+                        deskripsiProduk = item.deskripsiProduk ?: "",
+                        inventoriProduk = item.inventoriProduk ?: "",
+                        hargaJualDinein = item.hargaJualDinein,
+                        hargaJualLokal = item.hargaJualLokal,
+                        hargaJualVilla = item.hargaJualVilla,
+                        hitungPpn = item.hitungPpn ?: "Tidak",
+                        hitungService = item.hitungService ?: "Tidak",
+                        statusPenjualan = item.statusPenjualan ?: "Tersedia",
+                        gambarUrl = item.gambarUrl ?: "",
+                        totalTerjual = item.totalTerjual,
+                        varian = item.varian?.map { variant ->
+                            ProductVariantEntity(
+                                idVarian = variant.idVarian,
+                                produkId = variant.produkId,
+                                namaVarian = variant.namaVarian
+                            )
+                        } ?: emptyList()
+                    )
+                }
 
-    suspend fun markAsSynced(uuid: String) {
-        productDao.updateSyncStatus(uuid, SyncStatus.SYNCED)
-    }
-
-    suspend fun markAsFailed(uuid: String) {
-        productDao.updateSyncStatus(uuid, SyncStatus.FAILED)
-    }
-
-    suspend fun getProductsBySyncStatus(syncStatus: SyncStatus): List<ProductEntity> {
-        return productDao.getProductsBySyncStatus(syncStatus)
-    }
-
-    /**
-     * Bulk insert from server response. Marks as SYNCED to avoid re-uploading.
-     */
-    suspend fun bulkInsertFromServer(products: List<ProductEntity>): List<Long> {
-        val productsMarkedSynced = products.map { it.copy(syncStatus = SyncStatus.SYNCED) }
-        return productDao.insertProducts(productsMarkedSynced)
+                // Simpan ke Room Database
+                productDao.syncProducts(entities)
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.message ?: "Gagal memuat data produk."))
+            }
+        } catch (e: Exception) {
+            Log.e("ProductRepository", "Sync failed: ${e.message}")
+            Result.failure(e)
+        }
     }
 }

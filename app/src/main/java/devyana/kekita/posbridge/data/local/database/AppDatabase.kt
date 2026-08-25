@@ -13,19 +13,7 @@ import devyana.kekita.posbridge.data.local.entity.ProductEntity
 import devyana.kekita.posbridge.data.local.entity.SyncStatus
 
 // ─── Type Converters ───────────────────────────────────────────────────────────
-
-class AppTypeConverters {
-
-    @TypeConverter
-    fun fromSyncStatus(syncStatus: SyncStatus): String {
-        return syncStatus.name
-    }
-
-    @TypeConverter
-    fun toSyncStatus(value: String): SyncStatus {
-        return SyncStatus.valueOf(value)
-    }
-}
+// Now using ProductConverters inside devyana.kekita.posbridge.data.local.converter
 
 // ─── Migrations ────────────────────────────────────────────────────────────────
 
@@ -47,10 +35,11 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     entities = [
         ProductEntity::class
     ],
-    version = 1,
-    exportSchema = true
+    version = 2, // Bump version due to massive schema change
+    exportSchema = false
 )
-@TypeConverters(AppTypeConverters::class)
+// Using ProductConverters defined in ProductEntity directly, but we can also declare it here:
+// @TypeConverters(devyana.kekita.posbridge.data.local.converter.ProductConverters::class)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun productDao(): ProductDao

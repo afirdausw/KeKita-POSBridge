@@ -63,15 +63,28 @@ import devyana.kekita.posbridge.ui.payment.PaymentTransactionOrder
 import devyana.kekita.posbridge.ui.payment.TransactionStatus
 import devyana.kekita.posbridge.ui.payment.components.CheckoutPaymentItem
 import devyana.kekita.posbridge.utils.PosPreferenceManager
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun CheckerScreenContent(
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
     onNavigateToPos: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val colorScheme = MaterialTheme.colorScheme
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    devyana.kekita.posbridge.ui.components.PosPullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
+    ) {
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = Belum Diproses, 1 = Sedang Dikerjakan, 2 = Siap Diantar, 3 = Semua
     var searchQuery by remember { mutableStateOf("") }
@@ -398,6 +411,7 @@ fun CheckerScreenContent(
                     )
                 }
             }
+        }
         }
     }
 }

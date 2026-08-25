@@ -2,56 +2,62 @@ package devyana.kekita.posbridge.data.local.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.TypeConverters
+import devyana.kekita.posbridge.data.local.converter.ProductConverters
 
-@Entity(
-    tableName = "products",
-    indices = [
-        Index(value = ["uuid"], unique = true),
-        Index(value = ["sync_status"]),
-        Index(value = ["is_deleted"])
-    ]
-)
+@Entity(tableName = "products")
+@TypeConverters(ProductConverters::class)
 data class ProductEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "id_produk")
+    val idProduk: Long,
 
-    @PrimaryKey(autoGenerate = true)
-    @ColumnInfo(name = "id")
-    val id: Long = 0,
+    @ColumnInfo(name = "nama_produk")
+    val namaProduk: String,
 
-    @ColumnInfo(name = "uuid")
-    val uuid: String,
+    @ColumnInfo(name = "kategori")
+    val kategori: String,
 
-    @ColumnInfo(name = "name")
-    val name: String,
+    @ColumnInfo(name = "jenis_produk")
+    val jenisProduk: String,
 
-    @ColumnInfo(name = "description")
-    val description: String = "",
+    @ColumnInfo(name = "deskripsi_produk")
+    val deskripsiProduk: String,
 
-    @ColumnInfo(name = "price")
-    val price: Double,
+    @ColumnInfo(name = "inventori_produk")
+    val inventoriProduk: String,
 
-    @ColumnInfo(name = "stock")
-    val stock: Int = 0,
+    @ColumnInfo(name = "harga_jual_dinein")
+    val hargaJualDinein: Int,
 
-    @ColumnInfo(name = "category")
-    val category: String = "",
+    @ColumnInfo(name = "harga_jual_lokal")
+    val hargaJualLokal: Int,
 
-    @ColumnInfo(name = "image_url")
-    val imageUrl: String = "",
+    @ColumnInfo(name = "harga_jual_villa")
+    val hargaJualVilla: Int,
 
-    @ColumnInfo(name = "is_active")
-    val isActive: Boolean = true,
+    @ColumnInfo(name = "hitung_ppn")
+    val hitungPpn: String,
 
-    @ColumnInfo(name = "is_deleted")
-    val isDeleted: Boolean = false,
+    @ColumnInfo(name = "hitung_service")
+    val hitungService: String,
 
-    @ColumnInfo(name = "sync_status")
-    val syncStatus: SyncStatus = SyncStatus.PENDING,
+    @ColumnInfo(name = "status_penjualan")
+    val statusPenjualan: String,
 
-    @ColumnInfo(name = "created_at")
-    val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "gambar_url")
+    val gambarUrl: String,
 
-    @ColumnInfo(name = "updated_at")
-    val updatedAt: Long = System.currentTimeMillis()
+    @ColumnInfo(name = "total_terjual")
+    val totalTerjual: Int,
+
+    @ColumnInfo(name = "varian")
+    val varian: List<ProductVariantEntity>
+)
+
+data class ProductVariantEntity(
+    val idVarian: String,
+    val produkId: String,
+    val namaVarian: String
 )

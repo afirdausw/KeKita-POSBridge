@@ -50,6 +50,9 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
 
+    // Coil for Image Loading (handles caching)
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
     // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)

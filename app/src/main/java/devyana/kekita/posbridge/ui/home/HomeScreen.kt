@@ -38,6 +38,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -75,6 +77,7 @@ import devyana.kekita.posbridge.ui.components.dashedBorder
 import devyana.kekita.posbridge.ui.payment.components.CheckoutPaymentItem
 import devyana.kekita.posbridge.ui.payment.components.CheckoutPaymentModal
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreenContent(
     viewModel: HomeViewModel,
@@ -185,6 +188,7 @@ fun HomeScreenContent(
             PosHeader(
                 invoiceNumber = uiState.invoiceNumber,
                 businessDate = uiState.businessDate,
+                userName = uiState.homeData?.displayName ?: "Owner",
                 outletName = uiState.homeData?.outletName ?: "KeKita"
             )
 
@@ -214,15 +218,21 @@ fun HomeScreenContent(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            ProductGrid(
-                products = uiState.filteredProducts,
-                cartItems = uiState.cartItems,
-                onProductClick = { product ->
-                    focusManager.clearFocus()
-                    viewModel.onProductClick(product)
-                },
-                modifier = Modifier.weight(1f)
-            )
+            devyana.kekita.posbridge.ui.components.PosPullToRefreshBox(
+                isRefreshing = uiState.syncState == devyana.kekita.posbridge.ui.home.ServerSyncState.SYNCING_DOWN,
+                onRefresh = { viewModel.syncProducts() },
+                modifier = Modifier.weight(1f).fillMaxWidth()
+            ) {
+                ProductGrid(
+                    products = uiState.filteredProducts,
+                    cartItems = uiState.cartItems,
+                    onProductClick = { product ->
+                        focusManager.clearFocus()
+                        viewModel.onProductClick(product)
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
 
         OrderPanel(
@@ -574,7 +584,7 @@ private fun ProductCard(
                     verticalAlignment = Alignment.Bottom
                 ) {
                     Column {
-                        StockDots(warningLevel = product.warningLevel)
+                        StockDots(hasPpn = product.hasPpn, hasService = product.hasService)
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = formatRupiah(product.price),
@@ -643,17 +653,21 @@ private fun AvailabilityBadge(available: Boolean) {
 }
 
 @Composable
-private fun StockDots(warningLevel: Int) {
+private fun StockDots(hasPpn: Boolean, hasService: Boolean) {
     val colorScheme = MaterialTheme.colorScheme
     Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        repeat(2) {
-            Box(
-                modifier = Modifier
-                    .size(5.dp)
-                    .clip(CircleShape)
-                    .background(if (warningLevel > 0) colorScheme.error else colorScheme.tertiary)
-            )
-        }
+        Box(
+            modifier = Modifier
+                .size(5.dp)
+                .clip(CircleShape)
+                .background(if (hasPpn) colorScheme.tertiary else colorScheme.error)
+        )
+        Box(
+            modifier = Modifier
+                .size(5.dp)
+                .clip(CircleShape)
+                .background(if (hasService) colorScheme.tertiary else colorScheme.error)
+        )
     }
 }
 

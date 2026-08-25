@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,7 +48,8 @@ private val menuRouteOrder = listOf(
     Screen.Product.route,
     Screen.Report.route,
     Screen.Payment.route,
-    Screen.Checker.route
+        Screen.Checker.route,
+    Screen.Settings.route
 )
 
 @Composable
@@ -60,6 +62,7 @@ fun MainDashboardScreen(
     val activity = context as? Activity
     var currentRoute by remember { mutableStateOf(Screen.Home.route) }
     var showLogoutAccountDialog by remember { mutableStateOf(false) }
+    var showLogoutSystemDialog by remember { mutableStateOf(false) }
     var backPressedTime by remember { mutableLongStateOf(0L) }
 
     // Handing Double Back Press & Tab Navigation
@@ -93,6 +96,20 @@ fun MainDashboardScreen(
         )
     }
 
+    if (showLogoutSystemDialog) {
+        LogoutDialog(
+            title = "Logout Sistem",
+            message = "Ini akan menghapus akun dan konfigurasi outlet. Aplikasi kembali ke awal.",
+            confirmText = "Ya, Reset",
+            onDismiss = { showLogoutSystemDialog = false },
+            onConfirm = {
+                showLogoutSystemDialog = false
+                homeViewModel.logoutSystem()
+                onLogoutSystem()
+            }
+        )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -101,8 +118,12 @@ fun MainDashboardScreen(
             .navigationBarsPadding()
     ) {
         // Sidebar tetap stay di sebelah kiri (Dark theme token)
+        val uiState by homeViewModel.uiState.collectAsState()
         PosSidebar(
             currentRoute = currentRoute,
+            logoUrl = uiState.homeData?.logoUrl ?: "",
+            syncState = uiState.syncState,
+            onSyncClick = { homeViewModel.pingServer() },
             onNavigateToRoute = { newRoute -> currentRoute = newRoute },
             onLogoutAccount = { showLogoutAccountDialog = true },
             onLogoutSystem = onLogoutSystem
@@ -159,9 +180,19 @@ fun MainDashboardScreen(
                         Screen.Product.route -> ProductScreenContent()
                         Screen.Report.route -> ReportScreenContent()
                         Screen.Payment.route -> PaymentScreenContent(
+                            isRefreshing = uiState.syncState == devyana.kekita.posbridge.ui.home.ServerSyncState.SYNCING_DOWN,
+                            onRefresh = { homeViewModel.simulateSync() },
                             onNavigateToPos = { currentRoute = Screen.Home.route }
                         )
-                        Screen.Checker.route -> CheckerScreenContent()
+                        Screen.Checker.route -> CheckerScreenContent(
+                            isRefreshing = uiState.syncState == devyana.kekita.posbridge.ui.home.ServerSyncState.SYNCING_DOWN,
+                            onRefresh = { homeViewModel.simulateSync() }
+                        )
+                        Screen.Settings.route -> devyana.kekita.posbridge.ui.settings.SettingsScreenContent(
+                            viewModel = homeViewModel,
+                            onLogoutAccount = { showLogoutAccountDialog = true },
+                            onLogoutSystem = { showLogoutSystemDialog = true }
+                        )
                         else -> HomeScreenContent(viewModel = homeViewModel)
                     }
                 }

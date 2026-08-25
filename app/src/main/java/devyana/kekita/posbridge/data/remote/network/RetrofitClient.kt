@@ -49,4 +49,12 @@ object RetrofitClient {
     fun createAuthApiService(outletApiDomain: String): AuthApiService {
         return buildRetrofit(outletApiDomain).create(AuthApiService::class.java)
     }
+
+    fun createProductApiService(domainUrl: String): devyana.kekita.posbridge.data.remote.api.ProductApiService {
+        return buildRetrofit(domainUrl).create(devyana.kekita.posbridge.data.remote.api.ProductApiService::class.java)
+    }
+
+    fun createPingApiService(domainUrl: String): devyana.kekita.posbridge.data.remote.api.PingApiService {
+        return buildRetrofit(domainUrl).create(devyana.kekita.posbridge.data.remote.api.PingApiService::class.java)
+    }
 }

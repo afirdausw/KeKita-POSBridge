@@ -18,8 +18,6 @@ import java.util.Date
 import java.util.Locale
 
 private const val DUMMY_PRODUCT_TOTAL = 211
-private const val FOOD_CATEGORY = "Makanan"
-private const val DRINK_CATEGORY = "Minuman"
 
 data class HomeData(
     val displayName: String,
@@ -36,12 +34,15 @@ data class PosProduct(
     val id: Long,
     val name: String,
     val category: String,
+    val productType: String,
     val price: Int,
+    val imageUrl: String = "",
     val isAvailable: Boolean = true,
     val isSelected: Boolean = false,
     val hasAddon: Boolean = false,
     val variants: List<String> = emptyList(),
-    val warningLevel: Int = 0
+    val hasPpn: Boolean = false,
+    val hasService: Boolean = false
 )
 
 data class CartItem(
@@ -62,6 +63,14 @@ data class TableItem(
     val name: String,
     val status: String = "Tersedia"
 )
+
+enum class ServerSyncState {
+    IDLE,
+    SYNCING_DOWN,
+    SYNCING_UP,
+    PINGING,
+    ERROR_OFFLINE
+}
 
 data class HomePosUiState(
     val homeData: HomeData? = null,
@@ -85,7 +94,9 @@ data class HomePosUiState(
     val confirmedTable: TableItem? = null,
     // Order success dialog state
     val showOrderSuccessDialog: Boolean = false,
-    val orderSuccessMessage: String = ""
+    val orderSuccessMessage: String = "",
+    // Sync state
+    val syncState: ServerSyncState = ServerSyncState.IDLE
 ) {
     val filteredProducts: List<PosProduct>
         get() = products.filter { product ->
@@ -98,12 +109,12 @@ data class HomePosUiState(
 
     val foodCount: Int
         get() = cartItems
-            .filter { it.product.category == FOOD_CATEGORY }
+            .filter { it.product.productType.equals("Makanan", ignoreCase = true) }
             .sumOf { it.quantity }
 
     val drinkCount: Int
         get() = cartItems
-            .filter { it.product.category == DRINK_CATEGORY }
+            .filter { it.product.productType.equals("Minuman", ignoreCase = true) }
             .sumOf { it.quantity }
 
     val subtotal: Int
@@ -116,6 +127,7 @@ data class HomePosUiState(
 class HomeViewModel(
     private val authRepository: AuthRepository,
     private val outletRepository: OutletRepository,
+    private val productRepository: devyana.kekita.posbridge.data.repository.ProductRepository,
     private val posPreferenceManager: PosPreferenceManager
 ) : ViewModel() {
 
@@ -125,6 +137,8 @@ class HomeViewModel(
     init {
         loadData()
         startClock()
+        observeProducts()
+        syncProducts()
     }
 
     private fun startClock() {
@@ -135,6 +149,80 @@ class HomeViewModel(
                 _uiState.update { it.copy(businessDate = currentTimeFormatted) }
                 delay(1000)
             }
+        }
+    }
+
+    private fun observeProducts() {
+        viewModelScope.launch {
+            productRepository.getAllProducts().collect { entities ->
+                val savedCart = posPreferenceManager.getCartItems()
+                val activeProductIds = savedCart.map { it.product.id }.toSet()
+
+                val products = entities.map { entity ->
+                    val cat = if (entity.kategori.isBlank()) "Tanpa Kategori" else entity.kategori
+                    PosProduct(
+                        id = entity.idProduk,
+                        name = entity.namaProduk,
+                        category = cat,
+                        productType = entity.jenisProduk,
+                        price = entity.hargaJualDinein,
+                        imageUrl = entity.gambarUrl,
+                        isAvailable = entity.statusPenjualan == "Tersedia",
+                        isSelected = activeProductIds.contains(entity.idProduk),
+                        hasAddon = entity.varian.isNotEmpty(),
+                        variants = entity.varian.map { it.namaVarian },
+                        hasPpn = entity.hitungPpn.equals("Ya", ignoreCase = true),
+                        hasService = entity.hitungService.equals("Ya", ignoreCase = true)
+                    )
+                }
+
+                val categories = listOf("Semua") + products.map { it.category }.distinct().sorted()
+
+                _uiState.update { state ->
+                    state.copy(
+                        products = products,
+                        categories = categories,
+                        totalProductCount = products.size
+                    )
+                }
+            }
+        }
+    }
+
+    fun pingServer() {
+        val currentState = _uiState.value.syncState
+        if (currentState == ServerSyncState.SYNCING_DOWN || currentState == ServerSyncState.SYNCING_UP || currentState == ServerSyncState.PINGING) {
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(syncState = ServerSyncState.PINGING) }
+            val result = outletRepository.pingServer()
+            if (result.isSuccess) {
+                _uiState.update { it.copy(syncState = ServerSyncState.IDLE) }
+            } else {
+                _uiState.update { it.copy(syncState = ServerSyncState.ERROR_OFFLINE) }
+            }
+        }
+    }
+
+    fun syncProducts() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(syncState = ServerSyncState.SYNCING_DOWN) }
+            val result = productRepository.syncProducts()
+            if (result.isSuccess) {
+                _uiState.update { it.copy(syncState = ServerSyncState.IDLE) }
+            } else {
+                _uiState.update { it.copy(syncState = ServerSyncState.ERROR_OFFLINE) }
+            }
+        }
+    }
+
+    fun simulateSync() {
+        if (_uiState.value.syncState == ServerSyncState.SYNCING_DOWN) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(syncState = ServerSyncState.SYNCING_DOWN) }
+            kotlinx.coroutines.delay(1000)
+            _uiState.update { it.copy(syncState = ServerSyncState.IDLE) }
         }
     }
 
@@ -154,17 +242,10 @@ class HomeViewModel(
         // Restore persisted cart & confirmed table from SharedPreferences
         val savedCart = posPreferenceManager.getCartItems()
         val savedTable = posPreferenceManager.getConfirmedTable()
-        val activeProductIds = savedCart.map { it.product.id }.toSet()
-
-        val initialProducts = dummyProducts.map { product ->
-            product.copy(isSelected = activeProductIds.contains(product.id))
-        }
 
         _uiState.value = HomePosUiState(
             homeData = homeData,
-            categories = dummyCategories,
-            products = initialProducts,
-            tables = dummyTables,
+            tables = dummyTables, // Tables can remain dummy for now or be fetched later
             cartItems = savedCart,
             confirmedTable = savedTable
         )
@@ -368,10 +449,10 @@ class HomeViewModel(
         if (state.confirmedTable == null) return false
 
         val hasDrink = state.cartItems.any {
-            it.product.category in listOf("Minuman", "Beer", "Black Coffee Based", "Hot Drinks", "Milk Based", "Sparkling & Juice")
+            it.product.productType.equals("Minuman", ignoreCase = true)
         }
         val hasFood = state.cartItems.any {
-            it.product.category in listOf("Makanan", "Adds On", "Asian", "Delivery", "Indonesian Hype", "Snack")
+            it.product.productType.equals("Makanan", ignoreCase = true)
         } || (!hasDrink)
 
         val destinationText = when {
@@ -382,11 +463,16 @@ class HomeViewModel(
 
         val message = "Yeay, pesanan telah berhasil dikirim ke $destinationText"
 
-        _uiState.update {
-            it.copy(
-                showOrderSuccessDialog = true,
-                orderSuccessMessage = message
-            )
+        viewModelScope.launch {
+            _uiState.update { it.copy(syncState = ServerSyncState.SYNCING_UP) }
+            delay(800) // Simulate network upload delay
+            _uiState.update {
+                it.copy(
+                    showOrderSuccessDialog = true,
+                    orderSuccessMessage = message,
+                    syncState = ServerSyncState.IDLE
+                )
+            }
         }
         return true
     }
@@ -416,44 +502,6 @@ class HomeViewModel(
     }
 
     private companion object {
-        val dummyCategories = listOf(
-            "Semua",
-            "Adds On",
-            "Asian",
-            "Beer",
-            "Black Coffee Based",
-            "Delivery",
-            "Hot Drinks",
-            "Indonesian Hype",
-            "Manual Brew",
-            "Milk Based",
-            "Snack",
-            "Sparkling & Juice"
-        )
-
-        val dummyProducts = listOf(
-            PosProduct(1, "Soto Ayam", FOOD_CATEGORY, 35_000),
-            PosProduct(2, "Steam rice", FOOD_CATEGORY, 8_000),
-            PosProduct(3, "Original Tea", DRINK_CATEGORY, 10_000, hasAddon = true, variants = listOf("ICE", "HOT")),
-            PosProduct(4, "Special Fried Rice", FOOD_CATEGORY, 40_000),
-            PosProduct(5, "Javanese Fried Rice", FOOD_CATEGORY, 35_000),
-            PosProduct(6, "Aqua 600ml", DRINK_CATEGORY, 6_000, warningLevel = 1),
-            PosProduct(7, "Bintang Large", DRINK_CATEGORY, 65_000, warningLevel = 1),
-            PosProduct(8, "Bintang Medium", DRINK_CATEGORY, 38_000, warningLevel = 1),
-            PosProduct(9, "Banana Pancake", "Snack", 30_000, hasAddon = true, variants = listOf("Original", "Cokelat", "Keju")),
-            PosProduct(10, "Cappucino", DRINK_CATEGORY, 30_000, hasAddon = true, variants = listOf("ICE", "HOT")),
-            PosProduct(11, "Ginger Lemongrass Tea", DRINK_CATEGORY, 25_000),
-            PosProduct(12, "Sate Ayam", FOOD_CATEGORY, 35_000),
-            PosProduct(13, "Ayam Bakar", FOOD_CATEGORY, 50_000),
-            PosProduct(14, "Special Juice", DRINK_CATEGORY, 30_000, hasAddon = true, variants = listOf("Alpukat", "Mangga", "Jeruk")),
-            PosProduct(15, "Eggs", FOOD_CATEGORY, 15_000, hasAddon = true, variants = listOf("Dadar", "Mata Sapi", "Rebus")),
-            PosProduct(16, "Draft Beer Bottle", DRINK_CATEGORY, 33_000, warningLevel = 1),
-            PosProduct(17, "French Fries", "Snack", 28_000),
-            PosProduct(18, "Rawon", FOOD_CATEGORY, 45_000),
-            PosProduct(19, "Hongkong Fried Rice", FOOD_CATEGORY, 42_000),
-            PosProduct(20, "Javanese Fried Noodle", FOOD_CATEGORY, 36_000)
-        )
-
         val dummyTables = (1..20).map { num ->
             val formatted = if (num < 10) "0$num" else "$num"
             TableItem(id = "meja_$num", name = "Meja $formatted", status = "Tersedia")

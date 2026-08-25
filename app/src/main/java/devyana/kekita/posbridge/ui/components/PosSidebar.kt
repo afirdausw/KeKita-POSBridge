@@ -34,8 +34,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import devyana.kekita.posbridge.R
 import devyana.kekita.posbridge.ui.navigation.Screen
+import devyana.kekita.posbridge.ui.home.ServerSyncState
 import devyana.kekita.posbridge.ui.theme.PosInactiveIcon
 import devyana.kekita.posbridge.ui.theme.PosLimeActive
 import devyana.kekita.posbridge.ui.theme.PosLimeActiveIcon
@@ -52,16 +55,19 @@ enum class LiveSyncState(
     val isPulsing: Boolean = false
 ) {
     CONNECTING("connection", R.drawable.ic_lucide_wifi, Color(0xFFF59E0B), 3000L, isPulsing = true),
-    SYNCING_1("sync to server", R.drawable.ic_lucide_refresh_cw, Color(0xFF06B6D4), 3000L, isRotating = true),
+    SYNCING_1("sync down", R.drawable.ic_lucide_refresh_cw, Color(0xFF06B6D4), 3000L, isRotating = true),
     CONNECTED("connected", R.drawable.ic_lucide_cloud_check, Color(0xFF10B981), 5000L),
     IDLE("idle", R.drawable.ic_lucide_server, Color(0xFF94A3B8), 3000L),
-    SYNCING_2("sync to server", R.drawable.ic_lucide_refresh_cw, Color(0xFF06B6D4), 3000L, isRotating = true),
+    SYNCING_2("sync up", R.drawable.ic_lucide_cloud_upload, Color(0xFF06B6D4), 3000L, isPulsing = true),
     DISCONNECTED("disconnect", R.drawable.ic_lucide_wifi_off, Color(0xFFEF4444), 5000L, isPulsing = true)
 }
 
 @Composable
 fun PosSidebar(
     currentRoute: String,
+    logoUrl: String,
+    syncState: ServerSyncState,
+    onSyncClick: () -> Unit,
     onNavigateToRoute: (String) -> Unit,
     onLogoutAccount: () -> Unit,
     onLogoutSystem: () -> Unit = {}
@@ -82,11 +88,25 @@ fun PosSidebar(
                 .background(PosSidebarDivider),
             contentAlignment = Alignment.Center
         ) {
-            ComposeImage(
-                painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                contentDescription = null,
-                modifier = Modifier.size(36.dp)
-            )
+            if (logoUrl.isNotBlank()) {
+                AsyncImage(
+                    model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        .data(logoUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Outlet Logo",
+                    modifier = Modifier.size(44.dp).clip(CircleShape),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    error = painterResource(id = R.drawable.ic_launcher_foreground),
+                    fallback = painterResource(id = R.drawable.ic_launcher_foreground)
+                )
+            } else {
+                ComposeImage(
+                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                    contentDescription = "Default Logo",
+                    modifier = Modifier.size(36.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -163,7 +183,10 @@ fun PosSidebar(
         Spacer(modifier = Modifier.weight(1f))
 
         // ─── LIVE SERVER SYNC STATUS INDICATOR (SIMULASI SERVER SYNC) ──────────
-        ServerSyncStatusWidget()
+        ServerSyncStatusWidget(
+            syncState = syncState,
+            onClick = onSyncClick
+        )
         Spacer(modifier = Modifier.height(12.dp))
 
         // Line Divider Spasi Bottom
@@ -175,41 +198,40 @@ fun PosSidebar(
         )
         Spacer(modifier = Modifier.height(14.dp))
 
-        // ─── Kelompok 3: Logout Akun (Lucide Icon) ───────────────────────────
+        // ─── Kelompok 3: Pengaturan (Lucide Icon) ───────────────────────────
         SidebarLucideItem(
-            iconRes = R.drawable.ic_lucide_log_out,
-            selected = false,
+            iconRes = R.drawable.ic_lucide_settings,
+            selected = currentRoute == Screen.Settings.route,
             activeColor = PosLimeActive,
             activeIconColor = PosLimeActiveIcon,
-            inactiveIconColor = Color(0xFFEF4444),
-            contentDescription = "Logout Akun",
-            onClick = onLogoutAccount
+            inactiveIconColor = PosInactiveIcon,
+            contentDescription = "Pengaturan",
+            onClick = { onNavigateToRoute(Screen.Settings.route) }
         )
     }
 }
 
 @Composable
 private fun ServerSyncStatusWidget(
+    syncState: ServerSyncState,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var currentIndex by remember { mutableIntStateOf(0) }
-    val states = LiveSyncState.entries
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            val current = states[currentIndex]
-            delay(current.durationMs)
-            currentIndex = (currentIndex + 1) % states.size
+    val currentState = remember(syncState) {
+        when (syncState) {
+            ServerSyncState.IDLE -> LiveSyncState.CONNECTED
+            ServerSyncState.SYNCING_DOWN -> LiveSyncState.SYNCING_1
+            ServerSyncState.SYNCING_UP -> LiveSyncState.SYNCING_2
+            ServerSyncState.PINGING -> LiveSyncState.SYNCING_1
+            ServerSyncState.ERROR_OFFLINE -> LiveSyncState.DISCONNECTED
         }
     }
-
-    val currentState = states[currentIndex]
 
     // Continuous rotation transition for Syncing state
     val infiniteTransition = rememberInfiniteTransition(label = "SyncAnimation")
     val rotationAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 360f,
+        targetValue = -360f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
@@ -231,7 +253,10 @@ private fun ServerSyncStatusWidget(
     val currentAlpha = if (currentState.isPulsing) pulseAlpha else 0.85f
 
     Box(
-        modifier = modifier.size(44.dp),
+        modifier = modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         // Inner Circle Backdrop
