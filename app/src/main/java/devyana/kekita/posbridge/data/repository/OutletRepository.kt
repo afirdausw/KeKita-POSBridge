@@ -2,6 +2,7 @@ package devyana.kekita.posbridge.data.repository
 
 import devyana.kekita.posbridge.data.remote.api.OutletApiService
 import devyana.kekita.posbridge.data.remote.model.AccessCodeResponse
+import devyana.kekita.posbridge.data.remote.network.RetrofitClient
 import devyana.kekita.posbridge.utils.OutletManager
 import retrofit2.Response
 
@@ -54,7 +55,7 @@ class OutletRepository(
             if (config?.apiDomain.isNullOrBlank()) {
                 return Result.failure(Exception("No API Domain"))
             }
-            val api = devyana.kekita.posbridge.data.remote.network.RetrofitClient.createPingApiService(config!!.apiDomain)
+            val api = RetrofitClient.createPingApiService(config!!.apiDomain)
             val res = api.ping()
             if (res.status == "success" || res.version != null) {
                 Result.success(true)

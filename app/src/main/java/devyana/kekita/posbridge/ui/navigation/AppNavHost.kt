@@ -26,7 +26,8 @@ fun AppNavHost(
     startDestination: String,
     outletRepository: OutletRepository,
     authRepository: AuthRepository,
-    productRepository: devyana.kekita.posbridge.data.repository.ProductRepository
+    productRepository: devyana.kekita.posbridge.data.repository.ProductRepository,
+    transactionRepository: devyana.kekita.posbridge.data.repository.TransactionRepository
 ) {
     NavHost(
         navController = navController,
@@ -73,7 +74,7 @@ fun AppNavHost(
         composable(Screen.Home.route) {
             val context = androidx.compose.ui.platform.LocalContext.current
             val posPreferenceManager = remember { devyana.kekita.posbridge.utils.PosPreferenceManager(context) }
-            val factory = HomeViewModelFactory(authRepository, outletRepository, productRepository, posPreferenceManager)
+            val factory = HomeViewModelFactory(authRepository, outletRepository, productRepository, transactionRepository, posPreferenceManager)
             val viewModel: HomeViewModel = viewModel(factory = factory)
 
             MainDashboardScreen(

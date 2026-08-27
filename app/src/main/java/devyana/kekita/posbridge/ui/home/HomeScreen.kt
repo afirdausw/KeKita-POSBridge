@@ -77,6 +77,13 @@ import devyana.kekita.posbridge.ui.components.dashedBorder
 import devyana.kekita.posbridge.ui.payment.components.CheckoutPaymentItem
 import devyana.kekita.posbridge.ui.payment.components.CheckoutPaymentModal
 
+data class CheckoutSnapshot(
+    val transactionId: String?,
+    val invoiceNo: String,
+    val tableNo: String,
+    val items: List<CheckoutPaymentItem>
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreenContent(
@@ -89,6 +96,7 @@ fun HomeScreenContent(
     val context = LocalContext.current
 
     var showCheckoutModal by remember { mutableStateOf(false) }
+    var checkoutSnapshot by remember { mutableStateOf<CheckoutSnapshot?>(null) }
 
     // Dialog Sukses Pesanan
     if (uiState.showOrderSuccessDialog) {
@@ -96,28 +104,34 @@ fun HomeScreenContent(
             message = uiState.orderSuccessMessage,
             onDismiss = viewModel::dismissOrderSuccessDialog,
             onNavigateToPayment = {
+                checkoutSnapshot = CheckoutSnapshot(
+                    transactionId = uiState.lastSavedTransactionId,
+                    invoiceNo = uiState.invoiceNumber,
+                    tableNo = uiState.confirmedTable?.name ?: "-",
+                    items = uiState.cartItems.map {
+                        CheckoutPaymentItem(
+                            id = it.id,
+                            qty = it.quantity,
+                            name = it.product.name,
+                            variant = it.selectedVariant,
+                            unitPrice = it.product.price,
+                            hasPpn = it.product.hasPpn,
+                            hasService = it.product.hasService
+                        )
+                    }
+                )
+                viewModel.dismissOrderSuccessDialog()
                 showCheckoutModal = true
             }
         )
     }
 
     // Modal Checkout Pembayaran
-    if (showCheckoutModal) {
-        val checkoutItems = remember(uiState.cartItems) {
-            uiState.cartItems.map {
-                CheckoutPaymentItem(
-                    id = it.id,
-                    qty = it.quantity,
-                    name = it.product.name,
-                    variant = it.selectedVariant,
-                    unitPrice = it.product.price
-                )
-            }
-        }
+    if (showCheckoutModal && checkoutSnapshot != null) {
         CheckoutPaymentModal(
-            invoiceNo = uiState.invoiceNumber,
-            tableNo = uiState.confirmedTable?.name ?: "-",
-            items = checkoutItems.ifEmpty {
+            invoiceNo = checkoutSnapshot!!.invoiceNo,
+            tableNo = checkoutSnapshot!!.tableNo,
+            items = checkoutSnapshot!!.items.ifEmpty {
                 listOf(
                     CheckoutPaymentItem("1", 1, "Soto Ayam", null, 35_000),
                     CheckoutPaymentItem("2", 1, "Steam rice", null, 8_000),
@@ -127,11 +141,14 @@ fun HomeScreenContent(
             },
             onDismiss = {
                 showCheckoutModal = false
-                viewModel.dismissOrderSuccessDialog()
+                checkoutSnapshot = null
             },
-            onPaymentSuccess = {
+            onPaymentSuccess = { paidAmount ->
+                checkoutSnapshot?.transactionId?.let { txId ->
+                    viewModel.updateTransactionToPaid(txId, paidAmount)
+                }
                 showCheckoutModal = false
-                viewModel.dismissOrderSuccessDialog()
+                checkoutSnapshot = null
             }
         )
     }
@@ -1435,7 +1452,6 @@ private fun OrderSuccessDialog(
 
                     Button(
                         onClick = {
-                            onDismiss()
                             onNavigateToPayment()
                         },
                         modifier = Modifier

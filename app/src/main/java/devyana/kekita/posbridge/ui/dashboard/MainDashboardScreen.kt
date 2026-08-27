@@ -176,17 +176,25 @@ fun MainDashboardScreen(
                             viewModel = homeViewModel,
                             onNavigateToPayment = { currentRoute = Screen.Payment.route }
                         )
-                        Screen.Transaction.route -> TransactionScreenContent()
+                        Screen.Transaction.route -> TransactionScreenContent(
+                            transactions = homeViewModel.transactions.collectAsState().value,
+                            onProcessPayment = { txId, paidAmount ->
+                                homeViewModel.updateTransactionToPaid(txId, paidAmount)
+                            }
+                        )
                         Screen.Product.route -> ProductScreenContent()
                         Screen.Report.route -> ReportScreenContent()
                         Screen.Payment.route -> PaymentScreenContent(
+//                            transactions = homeViewModel.transactions.collectAsState().value,
                             isRefreshing = uiState.syncState == devyana.kekita.posbridge.ui.home.ServerSyncState.SYNCING_DOWN,
                             onRefresh = { homeViewModel.simulateSync() },
                             onNavigateToPos = { currentRoute = Screen.Home.route }
                         )
                         Screen.Checker.route -> CheckerScreenContent(
+//                            transactions = homeViewModel.transactions.collectAsState().value,
                             isRefreshing = uiState.syncState == devyana.kekita.posbridge.ui.home.ServerSyncState.SYNCING_DOWN,
-                            onRefresh = { homeViewModel.simulateSync() }
+                            onRefresh = { homeViewModel.simulateSync() },
+                            onNavigateToPos = { currentRoute = Screen.Home.route }
                         )
                         Screen.Settings.route -> devyana.kekita.posbridge.ui.settings.SettingsScreenContent(
                             viewModel = homeViewModel,

@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.navigation.compose.rememberNavController
+import devyana.kekita.posbridge.data.local.database.AppDatabase
 import devyana.kekita.posbridge.data.remote.network.RetrofitClient
 import devyana.kekita.posbridge.data.repository.AuthRepository
 import devyana.kekita.posbridge.data.repository.OutletRepository
@@ -34,8 +35,12 @@ class MainActivity : ComponentActivity() {
         )
 
         val productRepository = devyana.kekita.posbridge.data.repository.ProductRepository(
-            productDao = devyana.kekita.posbridge.data.local.database.AppDatabase.getInstance(applicationContext).productDao(),
+            productDao = AppDatabase.getInstance(applicationContext).productDao(),
             outletManager = outletManager
+        )
+
+        val transactionRepository = devyana.kekita.posbridge.data.repository.TransactionRepository(
+            transactionDao = AppDatabase.getInstance(applicationContext).transactionDao()
         )
 
         // ─── Tentukan start destination ───────────────────────────────────────
@@ -57,7 +62,8 @@ class MainActivity : ComponentActivity() {
                     startDestination = startDestination,
                     outletRepository = outletRepository,
                     authRepository = authRepository,
-                    productRepository = productRepository
+                    productRepository = productRepository,
+                    transactionRepository = transactionRepository
                 )
             }
         }

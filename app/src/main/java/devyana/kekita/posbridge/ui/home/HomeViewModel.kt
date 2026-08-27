@@ -4,13 +4,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import devyana.kekita.posbridge.data.repository.AuthRepository
 import devyana.kekita.posbridge.data.repository.OutletRepository
+import devyana.kekita.posbridge.data.repository.ProductRepository
+import devyana.kekita.posbridge.data.repository.TransactionRepository
+import devyana.kekita.posbridge.data.local.entity.TransactionEntity
+import devyana.kekita.posbridge.data.local.entity.TransactionDetailEntity
+import devyana.kekita.posbridge.data.local.entity.TransactionWithDetails
 import devyana.kekita.posbridge.utils.OutletManager
 import devyana.kekita.posbridge.utils.PosPreferenceManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -95,6 +102,7 @@ data class HomePosUiState(
     // Order success dialog state
     val showOrderSuccessDialog: Boolean = false,
     val orderSuccessMessage: String = "",
+    val lastSavedTransactionId: String? = null,
     // Sync state
     val syncState: ServerSyncState = ServerSyncState.IDLE
 ) {
@@ -128,17 +136,29 @@ class HomeViewModel(
     private val authRepository: AuthRepository,
     private val outletRepository: OutletRepository,
     private val productRepository: devyana.kekita.posbridge.data.repository.ProductRepository,
+    private val transactionRepository: devyana.kekita.posbridge.data.repository.TransactionRepository,
     private val posPreferenceManager: PosPreferenceManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomePosUiState())
     val uiState: StateFlow<HomePosUiState> = _uiState.asStateFlow()
 
+    val transactions: StateFlow<List<TransactionWithDetails>> = transactionRepository.getAllTransactionsWithDetails()
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         loadData()
         startClock()
+        refreshInvoice()
         observeProducts()
         syncProducts()
+    }
+
+    private fun refreshInvoice() {
+        viewModelScope.launch {
+            val newInvoice = transactionRepository.generateInvoice()
+            _uiState.update { it.copy(invoiceNumber = "Invoice #$newInvoice") }
+        }
     }
 
     private fun startClock() {
@@ -465,11 +485,88 @@ class HomeViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(syncState = ServerSyncState.SYNCING_UP) }
+            
+            // Calculate Transaction
+            val subtotal = state.cartItems.sumOf { it.subtotal }
+            var totalService = 0
+            var basePpn = 0
+            state.cartItems.forEach { item ->
+                val baseItem = item.subtotal.toDouble()
+                val serviceItem = if (item.product.hasService) Math.round(baseItem * 0.05).toInt() else 0
+                if (item.product.hasPpn) {
+                    basePpn += (baseItem.toInt() + serviceItem)
+                }
+                totalService += serviceItem
+            }
+            val totalPpn = Math.round(basePpn * 0.10).toInt()
+            val total = subtotal + totalService + totalPpn
+            
+            val sisa = total % 1000
+            val rounded = when {
+                sisa < 250 -> total - sisa
+                sisa < 750 -> total - sisa + 500
+                else -> total - sisa + 1000
+            }
+            val nilaiPembulatan = rounded - total
+            val totalHarusDibayar = rounded
+            
+            val idTransaksi = java.util.UUID.randomUUID().toString()
+            val invoice = state.invoiceNumber.removePrefix("Invoice #").trim()
+            val tDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+            val tTime = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            
+            val transactionEntity = TransactionEntity(
+                idTransaksi = idTransaksi,
+                tanggalTransaksi = tDate,
+                jamTransaksi = tTime,
+                customer = "Tamu",
+                meja = state.confirmedTable?.name ?: "-",
+                invoice = invoice,
+                totalPesanan = subtotal,
+                totalDiskonItem = 0,
+                totalDiskonPotongan = 0,
+                totalService = totalService,
+                totalPpn = totalPpn,
+                total = total,
+                nilaiPembulatan = nilaiPembulatan,
+                totalHarusDibayar = totalHarusDibayar,
+                bayar = 0,
+                statusTransaksi = "Menunggu Pembayaran",
+                tipeTransaksi = "Normal",
+                penggunaIdKasir = state.homeData?.username ?: "-",
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
+            )
+            
+            val details = state.cartItems.map { item ->
+                TransactionDetailEntity(
+                    idDetailTransaksi = java.util.UUID.randomUUID().toString(),
+                    transaksiId = idTransaksi,
+                    produkId = item.product.id.toString(),
+                    produkNama = item.product.name,
+                    produkPpn = item.product.hasPpn,
+                    produkService = item.product.hasService,
+                    jumlahProduk = item.quantity,
+                    jumlahTerbayar = 0,
+                    hargaSatuanProduk = item.product.price,
+                    subtotal = item.subtotal,
+                    diskonItemPersen = 0,
+                    diskonItem = 0,
+                    diskonItemPotongan = 0,
+                    statusItem = "konfirmasi",
+                    catatanItem = item.note,
+                    produkVarian = item.selectedVariant
+                )
+            }
+            
+            transactionRepository.saveTransaction(transactionEntity, details)
+
             delay(800) // Simulate network upload delay
             _uiState.update {
                 it.copy(
                     showOrderSuccessDialog = true,
                     orderSuccessMessage = message,
+                    lastSavedTransactionId = idTransaksi,
                     syncState = ServerSyncState.IDLE
                 )
             }
@@ -479,6 +576,7 @@ class HomeViewModel(
 
     fun dismissOrderSuccessDialog() {
         posPreferenceManager.clearActivePosData()
+        refreshInvoice()
         _uiState.update { state ->
             state.copy(
                 showOrderSuccessDialog = false,
@@ -499,6 +597,18 @@ class HomeViewModel(
         authRepository.clearSession()
         outletRepository.clearOutletConfig()
         posPreferenceManager.clearActivePosData()
+    }
+
+    fun updateTransactionToPaid(transactionId: String, paidAmount: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val txDetails = transactionRepository.getTransactionById(transactionId) ?: return@launch
+            val updatedTx = txDetails.transaction.copy(
+                statusTransaksi = "Selesai",
+                bayar = paidAmount,
+                updatedAt = System.currentTimeMillis()
+            )
+            transactionRepository.updateTransaction(updatedTx)
+        }
     }
 
     private companion object {

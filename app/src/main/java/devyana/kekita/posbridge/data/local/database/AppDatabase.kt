@@ -9,8 +9,11 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import devyana.kekita.posbridge.data.local.dao.ProductDao
+import devyana.kekita.posbridge.data.local.dao.TransactionDao
 import devyana.kekita.posbridge.data.local.entity.ProductEntity
 import devyana.kekita.posbridge.data.local.entity.SyncStatus
+import devyana.kekita.posbridge.data.local.entity.TransactionEntity
+import devyana.kekita.posbridge.data.local.entity.TransactionDetailEntity
 
 // ─── Type Converters ───────────────────────────────────────────────────────────
 // Now using ProductConverters inside devyana.kekita.posbridge.data.local.converter
@@ -33,9 +36,11 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
 
 @Database(
     entities = [
-        ProductEntity::class
+        ProductEntity::class,
+        TransactionEntity::class,
+        TransactionDetailEntity::class
     ],
-    version = 2, // Bump version due to massive schema change
+    version = 3, // Bump version for Transaction tables
     exportSchema = false
 )
 // Using ProductConverters defined in ProductEntity directly, but we can also declare it here:
@@ -43,6 +48,7 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun productDao(): ProductDao
+    abstract fun transactionDao(): TransactionDao
 
     companion object {
 
@@ -64,7 +70,7 @@ abstract class AppDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .addMigrations(MIGRATION_1_2)
-                .fallbackToDestructiveMigrationOnDowngrade()
+                .fallbackToDestructiveMigration()
                 .build()
         }
     }

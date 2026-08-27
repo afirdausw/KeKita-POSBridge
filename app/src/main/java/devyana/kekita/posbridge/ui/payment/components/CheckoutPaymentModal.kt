@@ -86,7 +86,9 @@ data class CheckoutPaymentItem(
     val name: String,
     val variant: String? = null,
     val unitPrice: Int,
-    val note: String? = null
+    val note: String? = null,
+    val hasPpn: Boolean = true,
+    val hasService: Boolean = true
 ) {
     val totalOriginal: Int = unitPrice * qty
 }
@@ -110,7 +112,7 @@ fun CheckoutPaymentModal(
         CheckoutPaymentItem("4", 1, "Eggs", "OMELETE", 15_000)
     ),
     onDismiss: () -> Unit,
-    onPaymentSuccess: () -> Unit = {}
+    onPaymentSuccess: (Int) -> Unit = {}
 ) {
     val context = LocalContext.current
     var selectedBillMode by remember { mutableStateOf(BillMode.NORMAL) }
@@ -177,19 +179,50 @@ fun CheckoutPaymentModal(
 
     val isAnyItemCheckedInSplit = !isSplitBill || activeItemsForCalculation.isNotEmpty()
 
-    // Calculation logic
+    // Calculation logic according to PAYMENT_LOGIC.md
     val rawSubtotal = activeItemsForCalculation.sumOf { it.totalOriginal }
     val itemDiscountTotal = activeItemsForCalculation.sumOf { item ->
         val pct = itemDiscountsPercent[item.id] ?: 0
         (item.totalOriginal * pct) / 100
     }
-    val potongan = 0
+    
+    // Potongan (global) - currently not hooked up to a UI state, assumed 0 for now as per view-only requirement
+    val potongan = 0 
+    
     val subtotalAfterDiscount = (rawSubtotal - itemDiscountTotal - potongan).coerceAtLeast(0)
-    val serviceTax = if (isAnyItemCheckedInSplit && rawSubtotal > 0) (subtotalAfterDiscount * 5) / 100 else 0
-    val ppnTax = if (isAnyItemCheckedInSplit && rawSubtotal > 0) (subtotalAfterDiscount * 10) / 100 else 0
+    
+    // Calculate per-item service and PPN based on PAYMENT_LOGIC.md
+    val serviceTax = if (isAnyItemCheckedInSplit && rawSubtotal > 0) {
+        activeItemsForCalculation.filter { it.hasService }.sumOf { item ->
+            val pct = itemDiscountsPercent[item.id] ?: 0
+            val itemDis = (item.totalOriginal * pct) / 100
+            val itemSub = Math.max(0, item.totalOriginal - itemDis)
+            Math.round(itemSub * 0.05).toInt()
+        }
+    } else 0
+    
+    val ppnTax = if (isAnyItemCheckedInSplit && rawSubtotal > 0) {
+        activeItemsForCalculation.filter { it.hasPpn }.sumOf { item ->
+            val pct = itemDiscountsPercent[item.id] ?: 0
+            val itemDis = (item.totalOriginal * pct) / 100
+            val itemSub = Math.max(0, item.totalOriginal - itemDis)
+            val itemService = if (item.hasService) Math.round(itemSub * 0.05).toInt() else 0
+            Math.round((itemSub + itemService) * 0.10).toInt()
+        }
+    } else 0
+    
     val calculatedTotal = subtotalAfterDiscount + serviceTax + ppnTax
-    val pembulatan = if (isAnyItemCheckedInSplit && calculatedTotal > 0) 10 else 0
-    val totalToPay = if (isAnyItemCheckedInSplit) calculatedTotal + pembulatan else 0
+    
+    // Pembulatan ke kelipatan 500
+    val sisa = calculatedTotal % 1000
+    val roundedTotal = when {
+        !isAnyItemCheckedInSplit || calculatedTotal == 0 -> 0
+        sisa < 250 -> calculatedTotal - sisa
+        sisa < 750 -> calculatedTotal - sisa + 500
+        else -> calculatedTotal - sisa + 1000
+    }
+    val pembulatan = if (roundedTotal > 0) roundedTotal - calculatedTotal else 0
+    val totalToPay = roundedTotal
 
     // Auto-sync for non-cash payment methods only (QRIS/EDC/Transfer)
     LaunchedEffect(selectedPaymentMethod) {
@@ -226,7 +259,7 @@ fun CheckoutPaymentModal(
             onPrintReceipt = {
                 Toast.makeText(context, "Mencetak Struk Pembayaran...", Toast.LENGTH_SHORT).show()
                 if (!result.hasUnpaidItems) {
-                    onPaymentSuccess()
+                    onPaymentSuccess(paidAmount)
                     onDismiss()
                 } else {
                     activeCompletionResult = null
@@ -236,7 +269,7 @@ fun CheckoutPaymentModal(
             },
             onFinishAndClose = {
                 activeCompletionResult = null
-                onPaymentSuccess()
+                onPaymentSuccess(paidAmount)
                 onDismiss()
             }
         )
@@ -579,7 +612,7 @@ fun CheckoutPaymentModal(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = invoiceNo,
+                                text = if (invoiceNo.startsWith("#")) invoiceNo else "#$invoiceNo",
                                 fontSize = 17.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF475569)
@@ -929,7 +962,7 @@ private fun PaymentCompletedDialog(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "${result.invoiceNo} • Meja ${result.tableNo}",
+                    text = "#${result.invoiceNo} • Meja ${result.tableNo}",
                     fontSize = 13.sp,
                     color = Color(0xFF64748B)
                 )

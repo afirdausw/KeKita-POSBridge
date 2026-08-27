@@ -2,6 +2,8 @@ package devyana.kekita.posbridge.data.remote.network
 
 import devyana.kekita.posbridge.data.remote.api.AuthApiService
 import devyana.kekita.posbridge.data.remote.api.OutletApiService
+import devyana.kekita.posbridge.data.remote.api.PingApiService
+import devyana.kekita.posbridge.data.remote.api.ProductApiService
 import devyana.kekita.posbridge.utils.Constants.CENTRAL_API_URL
 import devyana.kekita.posbridge.utils.Constants.CONNECT_TIMEOUT_SECONDS
 import devyana.kekita.posbridge.utils.Constants.READ_TIMEOUT_SECONDS
@@ -50,11 +52,11 @@ object RetrofitClient {
         return buildRetrofit(outletApiDomain).create(AuthApiService::class.java)
     }
 
-    fun createProductApiService(domainUrl: String): devyana.kekita.posbridge.data.remote.api.ProductApiService {
-        return buildRetrofit(domainUrl).create(devyana.kekita.posbridge.data.remote.api.ProductApiService::class.java)
+    fun createProductApiService(domainUrl: String): ProductApiService {
+        return buildRetrofit(domainUrl).create(ProductApiService::class.java)
     }
 
-    fun createPingApiService(domainUrl: String): devyana.kekita.posbridge.data.remote.api.PingApiService {
-        return buildRetrofit(domainUrl).create(devyana.kekita.posbridge.data.remote.api.PingApiService::class.java)
+    fun createPingApiService(domainUrl: String): PingApiService {
+        return buildRetrofit(domainUrl).create(PingApiService::class.java)
     }
 }
